@@ -1,0 +1,891 @@
+
+
+<!DOCTYPE html>
+
+<html lang="el" data-theme="dark">
+
+<head>
+
+<meta charset="UTF-8" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>Sensor Columns – Πάτρα</title>
+
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@300,400,500,600,700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<style>
+
+:root, [data-theme="light"] {
+
+  --color-bg:#f7f6f2; --color-surface:#f9f8f5; --color-surface-2:#fbfbf9; --color-surface-offset:#f3f0ec;
+
+  --color-divider:#dcd9d5; --color-border:#d4d1ca; --color-text:#28251d; --color-text-muted:#7a7974; --color-text-faint:#bab9b4; --color-text-inverse:#f9f8f4;
+
+  --color-primary:#01696f; --color-primary-hover:#0c4e54; --color-success:#437a22; --color-success-highlight:#d4dfcc; --color-warning:#964219; --color-warning-highlight:#ddcfc6; --color-error:#a12c7b;
+
+  --shadow-sm:0 1px 2px oklch(0.2 0.01 80 / 0.06); --shadow-md:0 4px 12px oklch(0.2 0.01 80 / 0.1); --shadow-lg:0 12px 32px oklch(0.2 0.01 80 / 0.14);
+
+  --radius-sm:0.375rem; --radius-md:0.5rem; --radius-lg:0.75rem; --radius-xl:1rem; --radius-full:9999px;
+
+  --transition-interactive:180ms cubic-bezier(0.16,1,0.3,1);
+
+  --text-xs:clamp(0.75rem,0.7rem + 0.25vw,0.875rem); --text-sm:clamp(0.875rem,0.8rem + 0.35vw,1rem); --text-base:clamp(1rem,0.95rem + 0.25vw,1.125rem); --text-lg:clamp(1.125rem,1rem + 0.75vw,1.5rem); --text-xl:clamp(1.5rem,1.2rem + 1.25vw,2.25rem);
+
+  --space-1:0.25rem; --space-2:0.5rem; --space-3:0.75rem; --space-4:1rem; --space-5:1.25rem; --space-6:1.5rem; --space-8:2rem; --space-10:2.5rem; --space-12:3rem;
+
+  --col1:#4f98a3; --col2:#e8af34; --col3:#6daa45;
+
+}
+
+[data-theme="dark"] {
+
+  --color-bg:#141312; --color-surface:#1a1918; --color-surface-2:#1f1e1c; --color-surface-offset:#242320;
+
+  --color-divider:#2e2d2b; --color-border:#353432; --color-text:#d4d3d0; --color-text-muted:#797876; --color-text-faint:#4d4c4b; --color-text-inverse:#2b2a28;
+
+  --color-primary:#4f98a3; --color-primary-hover:#3a808b; --color-success:#6daa45; --color-success-highlight:#253b1d; --color-warning:#e8af34; --color-warning-highlight:#3a2e10; --color-error:#d163a7;
+
+  --shadow-sm:0 1px 2px oklch(0 0 0 / 0.25); --shadow-md:0 4px 12px oklch(0 0 0 / 0.35); --shadow-lg:0 12px 32px oklch(0 0 0 / 0.45);
+
+}
+
+*{box-sizing:border-box}*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+html{height:100%;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+
+body{min-height:100vh;font-family:'Satoshi','Inter',sans-serif;font-size:var(--text-base);color:var(--color-text);background:var(--color-bg);display:flex;flex-direction:column}
+
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+
+a{color:inherit;text-decoration:none}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) var(--space-6);background:color-mix(in oklab,var(--color-surface) 88%, transparent);border-bottom:1px solid var(--color-border);position:sticky;top:0;z-index:200;backdrop-filter:blur(14px);box-shadow:var(--shadow-sm)}
+
+.logo{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);font-weight:600}
+
+.topbar-right{display:flex;align-items:center;gap:var(--space-3)}
+
+.view-toggle{display:flex;gap:2px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:2px}
+
+.view-btn{padding:0.4rem 0.9rem;border-radius:calc(var(--radius-md) - 2px);font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted)}
+
+.view-btn.active{background:var(--color-surface);color:var(--color-text);box-shadow:var(--shadow-sm)}
+
+.btn-icon{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius-md);color:var(--color-text-muted)}
+
+.btn-icon:hover{background:var(--color-surface-offset);color:var(--color-text)}
+
+.mqtt-pill{display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:var(--radius-full);border:1px solid var(--color-border);font-size:var(--text-xs);color:var(--color-text-muted);background:var(--color-surface-offset)}
+
+.mqtt-dot{width:7px;height:7px;border-radius:var(--radius-full);background:var(--color-text-faint)}
+
+.mqtt-dot.connecting{background:var(--color-warning)}
+
+.mqtt-dot.connected{background:var(--color-success)}
+
+.mqtt-dot.error{background:var(--color-error)}
+
+.main{flex:1;min-height:0;display:flex;flex-direction:column}
+
+#map-view{flex:1;min-height:0;display:flex;flex-direction:column}
+
+#map-view.hidden{display:none}
+
+#map{flex:1;min-height:0;width:100%}
+
+.map-strip{background:var(--color-surface);border-top:1px solid var(--color-border);padding:var(--space-3) var(--space-6);display:flex;align-items:center;gap:var(--space-6);flex-wrap:wrap;flex-shrink:0}
+
+.strip-item{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.strip-dot{width:10px;height:10px;border-radius:var(--radius-full);flex-shrink:0}
+
+.poll-controls{margin-left:auto;display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap}
+
+.strip-btn{display:flex;align-items:center;gap:6px;padding:0.4rem 0.85rem;border:1px solid var(--color-border);border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:600;color:var(--color-text-muted);background:var(--color-surface-offset);transition:var(--transition-interactive)}
+
+.strip-btn:hover{color:var(--color-text);border-color:var(--color-text-muted)}
+
+.strip-btn.active{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
+
+.poll-legend{display:none;align-items:center;gap:10px;padding:5px 12px 5px 10px;background:color-mix(in oklab,var(--color-surface) 90%,transparent);border:1px solid var(--color-border);border-radius:var(--radius-full);box-shadow:var(--shadow-sm)}
+
+.poll-legend.show{display:flex}
+
+.pl-end{font-size:var(--text-xs);font-weight:700;line-height:1}
+
+.poll-grad-wrap{display:flex;flex-direction:column;gap:3px}
+
+.poll-grad{width:140px;height:9px;border-radius:999px;background:linear-gradient(90deg,#27c24c,#e8c534,#f5872f,#e23b3b);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--color-text) 12%,transparent)}
+
+.poll-scale{display:flex;justify-content:space-between;font-size:9px;font-weight:600;color:var(--color-text-faint);font-variant-numeric:tabular-nums}
+
+.leaflet-popup-content-wrapper{background:var(--color-surface)!important;color:var(--color-text)!important;border:1px solid var(--color-border)!important;border-radius:var(--radius-lg)!important;padding:0!important;overflow:hidden;box-shadow:var(--shadow-lg)!important}
+
+.leaflet-popup-tip-container{display:none}
+
+.leaflet-popup-content{margin:0!important;width:auto!important;max-height:62vh;overflow:auto;padding-right:2px}
+
+.popup-inner{padding:var(--space-4) var(--space-5);min-width:240px;max-width:320px}
+
+.popup-header{display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)}
+
+.popup-dot{width:12px;height:12px;border-radius:var(--radius-full)}
+
+.popup-title{font-size:var(--text-sm);font-weight:700}
+
+.popup-subtitle{font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:var(--space-3)}
+
+.popup-coords{display:flex;flex-direction:column;gap:var(--space-1);background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3);margin-bottom:var(--space-4)}
+
+.coord-row{display:flex;justify-content:space-between;gap:var(--space-4);font-size:var(--text-xs)}
+
+.coord-label{color:var(--color-text-muted)}
+
+.coord-val{font-weight:600;font-variant-numeric:tabular-nums}
+
+.popup-metrics{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-bottom:var(--space-4)}
+
+.park-banner{display:flex;align-items:center;gap:10px;padding:8px 11px;border:1px solid var(--color-border);border-radius:var(--radius-md);margin-bottom:var(--space-4)}
+
+.popup-accent{height:4px;margin:-1rem -1.25rem 0.875rem;border-radius:0}
+
+.popup-poll{margin-bottom:var(--space-4)}
+
+.poll-meter{position:relative;height:10px;border-radius:999px;background:linear-gradient(90deg,#27c24c,#e8c534 38%,#f5872f 62%,#e23b3b);box-shadow:inset 0 0 0 1px color-mix(in oklab,var(--color-text) 12%,transparent)}
+
+.poll-meter-marker{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:var(--color-surface);border:3px solid var(--color-text);transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,0.4)}
+
+.poll-meter-scale{display:flex;justify-content:space-between;margin-top:5px;font-size:9px;color:var(--color-text-faint);font-variant-numeric:tabular-nums}
+
+.park-ico{font-size:1.35rem;line-height:1}
+
+.park-label{font-size:var(--text-sm);font-weight:800;line-height:1.15}
+
+.park-sub{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.popup-slider-wrap{margin-bottom:var(--space-4)}
+
+.popup-slider-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-2)}
+
+.popup-slider-label{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.popup-slider-value{font-size:var(--text-xs);font-weight:700;color:var(--color-text)}
+
+.popup-slider{appearance:none;-webkit-appearance:none;width:100%;height:8px;border-radius:999px;background:linear-gradient(90deg,var(--color-primary) 0%,var(--color-primary) var(--slider-fill,50%),var(--color-surface-offset) var(--slider-fill,50%),var(--color-surface-offset) 100%);outline:none;border:1px solid var(--color-border)}
+
+.popup-slider::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--color-primary);box-shadow:var(--shadow-sm)}
+
+.popup-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--color-primary);box-shadow:var(--shadow-sm)}
+
+.popup-slider-note{margin-top:var(--space-2);font-size:var(--text-xs);color:var(--color-text-faint)}
+
+.popup-more{border-top:1px solid var(--color-border);margin-top:var(--space-3);padding-top:var(--space-3)}
+
+.popup-more summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);cursor:pointer;font-size:var(--text-xs);font-weight:700;color:var(--color-text)}
+
+.popup-more summary::-webkit-details-marker{display:none}
+
+.popup-more-label{color:var(--color-text-muted);font-weight:600}
+
+.popup-more-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2);margin-top:var(--space-3)}
+
+.popup-more-card{background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)}
+
+.popup-more-card .pm-label{margin-bottom:2px}
+
+.popup-metric{background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3)}
+
+.pm-label{font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:2px}
+
+.pm-val{font-size:var(--text-sm);font-weight:600;font-variant-numeric:tabular-nums}
+
+.btn-dashboard{display:flex;align-items:center;justify-content:center;gap:var(--space-2);width:100%;padding:var(--space-2) var(--space-4);background:var(--color-primary);color:#fff;border-radius:var(--radius-md);font-size:var(--text-sm);font-weight:700;box-shadow:var(--shadow-sm)}
+
+.btn-dashboard:hover{background:var(--color-primary-hover)}
+
+#dashboard-view{display:none;flex:1;min-height:0;flex-direction:column;overflow:auto}
+
+#dashboard-view.active{display:flex}
+
+#overview-view{display:none;flex:1;min-height:0;overflow:auto}
+
+#overview-view.active{display:block}
+
+.section-inner{max-width:1200px;margin:0 auto;padding:var(--space-8) var(--space-6);width:100%}
+
+.dash-header{display:flex;align-items:center;gap:var(--space-4);margin-bottom:var(--space-6)}
+
+.dash-back{display:flex;align-items:center;gap:var(--space-1);font-size:var(--text-sm);font-weight:600;color:var(--color-text-muted);padding:var(--space-1) var(--space-2);border-radius:var(--radius-md)}
+
+.dash-back:hover{background:var(--color-surface-offset);color:var(--color-text)}
+
+.dash-title{font-size:var(--text-xl);font-weight:800;display:flex;align-items:center;gap:var(--space-3);letter-spacing:-0.02em}
+
+.dash-dot{width:14px;height:14px;border-radius:var(--radius-full);flex-shrink:0}
+
+.dash-sub{font-size:var(--text-xs);color:var(--color-text-muted);margin-top:var(--space-1);margin-bottom:var(--space-6)}
+
+.dash-hero{margin-top:calc(-1 * var(--space-4));margin-bottom:var(--space-6)}
+
+.dash-hero-row{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)}
+
+.dash-poll-chip{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-sm);font-weight:800;padding:5px 13px;border-radius:var(--radius-full);border:1px solid}
+
+.dash-hero .poll-meter{max-width:520px}.dash-hero .poll-meter-scale{max-width:520px}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:var(--space-4);margin-bottom:var(--space-6)}
+
+.kpi-card,.status-bar,.chart-card,.overview-card,.cmp-card{border:1px solid var(--color-border);background:var(--color-surface);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm)}
+
+.kpi-card{padding:var(--space-5);border-top:3px solid var(--kc,var(--color-primary))}
+
+.kpi-label{font-size:var(--text-xs);color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.09em;margin-bottom:var(--space-2)}
+
+.kpi-val{font-size:var(--text-xl);font-weight:800;line-height:1;font-variant-numeric:tabular-nums lining-nums;margin-bottom:var(--space-1)}
+
+.kpi-unit{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.kpi-freshness{font-size:var(--text-xs);color:var(--color-text-faint);margin-top:var(--space-2)}
+
+.status-bar{padding:var(--space-5);margin-bottom:var(--space-5)}
+
+.status-title{font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)}
+
+.status-items{display:flex;gap:var(--space-4);flex-wrap:wrap}
+
+.status-item{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.s-led{width:8px;height:8px;border-radius:var(--radius-full);background:var(--color-text-faint)}
+
+.s-led.live{background:var(--color-success)}
+
+.s-led.stale{background:var(--color-warning)}
+
+.led-control,.extras{margin-bottom:var(--space-5)}
+
+.led-control{border:1px solid var(--color-border);background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-5)}
+
+.led-title{font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)}
+
+.led-row{display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap}
+
+.led-badge{display:flex;align-items:center;gap:var(--space-2);padding:0.35rem 0.8rem;border-radius:var(--radius-full);font-size:var(--text-xs);font-weight:700;border:1px solid var(--color-border)}
+
+.led-badge.on{background:var(--color-warning-highlight);color:var(--color-warning);border-color:var(--color-warning)}
+
+.led-badge.off{background:var(--color-surface-offset);color:var(--color-text-muted)}
+
+.led-mode-btns{display:flex;gap:var(--space-2)}
+
+.led-mode-btn{padding:0.42rem 0.85rem;border-radius:var(--radius-md);font-size:var(--text-xs);font-weight:600;border:1px solid var(--color-border);background:var(--color-surface-offset);color:var(--color-text-muted)}
+
+.led-mode-btn.active{background:var(--color-primary);color:#fff;border-color:var(--color-primary)}
+
+.extra-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--space-4);margin-bottom:var(--space-5)}
+
+.extra-card{border:1px solid var(--color-border);background:var(--color-surface);border-radius:var(--radius-lg);padding:var(--space-4);display:flex;align-items:center;gap:var(--space-3)}
+
+.extra-icon{font-size:1.2rem;flex-shrink:0}
+
+.extra-label{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.extra-val{font-size:var(--text-sm);font-weight:600;font-variant-numeric:tabular-nums}
+
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:var(--space-5);margin-bottom:var(--space-6)}
+
+.chart-card{padding:var(--space-5)}
+
+.chart-title{font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-3)}
+
+.chart-wrap{height:180px;position:relative}
+
+.ov-title{font-size:var(--text-xl);font-weight:800;margin-bottom:var(--space-5);letter-spacing:-0.02em}
+
+.ov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:var(--space-4);margin-bottom:var(--space-6)}
+
+.ov-card{position:relative;overflow:hidden;border:1px solid var(--color-border);background:var(--color-surface);border-radius:var(--radius-xl);padding:var(--space-5);padding-top:calc(var(--space-5) + 5px);cursor:pointer;box-shadow:var(--shadow-md);transition:transform var(--transition-interactive),box-shadow var(--transition-interactive)}
+
+.ov-card::before{content:"";position:absolute;top:0;left:0;right:0;height:5px;background:var(--ov-accent,var(--color-primary))}
+
+.ov-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);border-color:color-mix(in oklab,var(--ov-accent,var(--color-primary)) 45%,var(--color-border))}
+
+.ov-header{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-4)}
+
+.ov-dot{width:12px;height:12px;border-radius:var(--radius-full)}
+
+.ov-name{font-size:var(--text-sm);font-weight:800}
+
+.ov-street{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.ov-metrics{display:grid;grid-template-columns:1fr 1fr;gap:var(--space-2)}
+
+.ov-m{border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);background:var(--color-bg);border:1px solid var(--color-border)}
+
+.ov-ml{font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.ov-mv{font-size:var(--text-sm);font-weight:700;font-variant-numeric:tabular-nums}
+
+.ov-poll{display:inline-flex;align-items:center;gap:5px;margin-top:var(--space-3);font-size:var(--text-xs);font-weight:700;padding:3px var(--space-2);border-radius:var(--radius-full)}
+
+.cmp-card{overflow:hidden;margin-bottom:var(--space-6)}
+
+.cmp-card table{width:100%;border-collapse:collapse;font-size:var(--text-xs);font-variant-numeric:tabular-nums}
+
+.cmp-card th{padding:var(--space-3) var(--space-4);text-align:left;font-weight:700;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.06em;background:var(--color-surface-offset);border-bottom:1px solid var(--color-border)}
+
+.cmp-card td{padding:var(--space-3) var(--space-4);border-bottom:1px solid var(--color-divider);color:var(--color-text)}
+
+.cmp-card tr:last-child td{border-bottom:none}
+
+.cmp-card tbody tr:nth-child(even) td{background:var(--color-surface-offset)}
+
+.cmp-card tbody tr:hover td{background:color-mix(in oklab,var(--color-primary) 9%,var(--color-surface))}
+
+.ov-sub{font-size:var(--text-sm);color:var(--color-text-muted);margin-top:calc(-1 * var(--space-3));margin-bottom:var(--space-6)}
+
+.col-badge{display:inline-flex;align-items:center;gap:var(--space-1);font-weight:700;font-size:var(--text-xs);padding:2px var(--space-2);border-radius:var(--radius-full)}
+
+.trend{display:inline-flex;align-items:center;gap:2px;font-size:var(--text-xs);font-weight:600;padding:2px var(--space-2);border-radius:var(--radius-full)}
+
+.trend.up{background:var(--color-success-highlight);color:var(--color-success)}
+
+.trend.down{background:var(--color-warning-highlight);color:var(--color-warning)}
+
+.cm{position:relative;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:var(--radius-full);border:2px solid #fff;box-shadow:0 0 0 2px var(--ring,transparent),0 3px 10px rgba(0,0,0,0.4);cursor:pointer;transition:transform 150ms ease}.cm:hover{transform:scale(1.12)}
+
+.cm svg{width:17px;height:17px;color:#fff}
+
+.cm.fake{border-style:dashed}
+
+.cm.alert{animation:cmPulse 1.7s ease-out infinite}
+
+@keyframes cmPulse{0%{box-shadow:0 0 0 2px var(--ring),0 0 0 0 color-mix(in oklab,var(--ring) 55%,transparent),0 3px 10px rgba(0,0,0,0.4)}70%{box-shadow:0 0 0 2px var(--ring),0 0 0 15px transparent,0 3px 10px rgba(0,0,0,0.4)}100%{box-shadow:0 0 0 2px var(--ring),0 0 0 0 transparent,0 3px 10px rgba(0,0,0,0.4)}}
+
+.cm-park{position:absolute;top:-7px;right:-7px;min-width:17px;height:17px;padding:0 3px;border-radius:999px;color:#fff;font-size:10px;font-weight:800;line-height:17px;text-align:center;border:2px solid var(--color-surface);box-shadow:0 1px 3px rgba(0,0,0,.45)}
+
+.diag-overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:20px}
+
+.diag-box{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-width:780px;width:100%;max-height:84vh;overflow:auto;padding:var(--space-5)}
+
+.diag-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2)}
+
+.diag-title{font-size:var(--text-lg);font-weight:800}
+
+.diag-col{margin-bottom:var(--space-4);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:var(--space-3)}
+
+.diag-h{font-weight:800;margin-bottom:6px}
+
+.diag-row{display:flex;align-items:center;gap:8px;font-size:var(--text-xs);padding:3px 0;flex-wrap:wrap}
+
+.diag-row>span{min-width:96px;color:var(--color-text-muted)}
+
+.diag-row code,.diag-all code{font-family:'DejaVu Sans Mono',monospace;background:var(--color-bg);border:1px solid var(--color-border);border-radius:4px;padding:1px 5px}
+
+.diag-row b{margin-left:auto;font-variant-numeric:tabular-nums}
+
+.diag-row.ok b{color:var(--color-success)}
+
+.diag-row.bad b{color:var(--color-error)}
+
+.diag-all{margin-top:8px;font-size:var(--text-xs);color:var(--color-text-muted);line-height:1.9}
+
+.diag-close{padding:6px 14px;border:1px solid var(--color-border);border-radius:var(--radius-md);font-weight:700;background:var(--color-surface-offset)}
+
+/* ===== ΣΥΓΚΡΙΣΗ (comparison view) ===== */
+
+#comparison-view{display:none;flex:1;min-height:0;overflow:auto}
+
+#comparison-view.active{display:block}
+
+.cmp-charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:var(--space-5)}
+
+.cmp-chart-card{padding:var(--space-5)}
+
+.cmp-wrap{height:230px}
+
+.cmp-now{display:flex;flex-wrap:wrap;gap:var(--space-4);margin-bottom:var(--space-3);font-size:var(--text-xs);color:var(--color-text-muted)}
+
+.cmp-now-item{display:flex;align-items:center;gap:6px}
+
+.cmp-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+.cmp-mm{margin-top:var(--space-3);border-top:1px solid var(--color-divider);padding-top:var(--space-3);display:flex;flex-direction:column;gap:5px}
+
+.cmp-mm-row{display:flex;align-items:center;gap:8px;font-size:var(--text-xs)}
+
+.cmp-mm-name{color:var(--color-text-muted);min-width:70px}
+
+.cmp-mm-val{font-weight:600;font-variant-numeric:tabular-nums;margin-left:auto;color:var(--color-text)}
+
+/* ===== EMBED MODE: κρύβει το πάνω μπάρα όταν μπαίνει σε iframe (#...,embed) ===== */
+
+.embed .topbar{display:none}
+
+.embed #dashboard-view{min-height:100vh}
+
+.embed #comparison-view{min-height:100vh;padding-top:var(--space-4)}
+
+@media (max-width:600px){.topbar{padding:var(--space-2) var(--space-3)}.section-inner{padding:var(--space-5) var(--space-3)}.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.poll-controls{margin-left:0;width:100%}}
+
+</style>
+
+</head>
+
+<body>
+
+<header class="topbar">
+
+  <div class="logo">
+
+    <svg width="24" height="24" viewBox="0 0 26 26" fill="none" aria-label="Sensor Columns logo">
+
+      <rect x="4" y="12" width="5" height="12" rx="1.5" fill="var(--col1)"/>
+
+      <rect x="10.5" y="7" width="5" height="17" rx="1.5" fill="var(--col2)"/>
+
+      <rect x="17" y="4" width="5" height="20" rx="1.5" fill="var(--col3)"/>
+
+      <circle cx="6.5" cy="10" r="2" fill="var(--col1)"/>
+
+      <circle cx="13" cy="5" r="2" fill="var(--col2)"/>
+
+      <circle cx="19.5" cy="2" r="2" fill="var(--col3)"/>
+
+    </svg>
+
+    <span>Sensor Columns</span>
+
+    <span style="font-size:var(--text-xs);color:var(--color-text-muted);font-weight:400">— Πάτρα</span>
+
+  </div>
+
+  <div class="topbar-right">
+
+    <div class="mqtt-pill"><div class="mqtt-dot connecting" id="status-dot"></div><span id="status-pill">Σύνδεση…</span></div>
+
+    <div class="view-toggle" role="group" aria-label="Αλλαγή προβολής">
+
+      <button class="view-btn active" id="btn-map" onclick="showView('map')">Χάρτης</button>
+
+      <button class="view-btn" id="btn-cmp" onclick="showView('comparison')">Σύγκριση</button>
+
+      <button class="view-btn" id="btn-ov" onclick="showView('overview')">Επισκόπηση</button>
+
+    </div>
+
+    <button class="btn-icon" id="theme-btn" title="Θέμα">☾</button>
+
+  </div>
+
+</header>
+
+<main class="main">
+
+  <div id="map-view"><div id="map"></div><div class="map-strip"><div class="strip-item"><div class="strip-dot" style="background:var(--col1)"></div>Κολώνα 1 — Πλ. Γεωργίου</div><div class="strip-item"><div class="strip-dot" style="background:var(--col2)"></div>Κολώνα 2 — Αγ. Νικολάου</div><div class="strip-item"><div class="strip-dot" style="background:var(--col3)"></div>Κολώνα 3 — Γούναρη</div><div class="strip-item" style="color:var(--color-text-faint)">+ 7 ψηφιακές (demo)</div><div class="poll-controls"><div class="poll-legend" id="poll-legend"><span class="pl-end" style="color:#27c24c">Καλή</span><div class="poll-grad-wrap"><div class="poll-grad"></div><div class="poll-scale"><span>0</span><span>40</span><span>65</span><span>100</span></div></div><span class="pl-end" style="color:#e23b3b">Υψηλή</span></div><button class="strip-btn" id="pollution-toggle" onclick="togglePollution()">◍ Χάρτης ρύπανσης</button><button class="strip-btn" onclick="runDiagnostics()">🔍 Έλεγχος αισθητήρων</button></div></div></div>
+
+  <div id="dashboard-view"><div class="section-inner"><div class="dash-header"><button class="dash-back" onclick="showView('map')">← Πίσω στο χάρτη</button></div><div class="dash-title"><div class="dash-dot" id="dash-dot"></div><span id="dash-name"></span></div><div class="dash-sub" id="dash-sub"></div><div class="dash-hero" id="dash-hero"></div><div class="kpi-grid" id="kpi-grid"></div><div class="status-bar"><div class="status-title">Κατάσταση αισθητήρων</div><div class="status-items" id="status-items"></div></div><div class="led-control" id="led-control" style="display:none"><div class="led-title">LED</div><div class="led-row"><div class="led-badge off" id="led-badge">● OFF</div><div class="led-mode-btns" id="led-mode-btns"><button class="led-mode-btn" onclick="sendLEDCmd('AUTO')">AUTO</button><button class="led-mode-btn" onclick="sendLEDCmd('ON')">ON</button><button class="led-mode-btn" onclick="sendLEDCmd('OFF')">OFF</button></div><div class="led-mode-btns" id="col2-led-btns" style="display:none"><button class="led-mode-btn" id="col2-led-on" onclick="toggleCol2LED(true)">ON</button><button class="led-mode-btn" id="col2-led-off" onclick="toggleCol2LED(false)">OFF</button></div></div></div><div class="extra-grid" id="extra-grid"></div><div class="charts-grid" id="charts-grid"></div></div></div>
+
+  <div id="overview-view"><div class="section-inner"><div class="ov-title">Επισκόπηση Κολωνών</div><div class="ov-sub" id="ov-sub"></div><div class="ov-grid" id="ov-grid"></div><div class="cmp-card"><table><thead><tr><th>Κολώνα</th><th>Θερμ. °C</th><th>Υγρ. %</th><th>CO₂ ppm</th><th>LDR</th><th>Πίεση hPa</th><th>Ρύπανση</th><th>Status</th></tr></thead><tbody id="cmp-tbody"></tbody></table></div></div></div>
+
+  <div id="comparison-view"><div class="section-inner"><div class="ov-title">Σύγκριση Κολωνών</div><div class="ov-sub">Ζωντανή σύγκριση των 3 πραγματικών κολωνών ανά μέτρηση (τελευταίο 24ωρο).</div><div class="cmp-charts" id="cmp-charts"></div></div></div>
+
+</main>
+
+<script>
+
+// === ΣΥΝΔΕΣΗ ΜΕ HOME ASSISTANT ===================================
+
+// Αν η σελίδα σερβίρεται ΜΕΣΑ από το Home Assistant (π.χ. /local/dashboard_kolones.html),
+
+// χρησιμοποιούμε το ΙΔΙΟ origin. Έτσι δουλεύει και σε http ΚΑΙ σε https, χωρίς
+
+// mixed-content μπλοκάρισμα, όποια IP/όνομα κι αν έχει το HA σου.
+
+// Αν την ανοίξεις σαν τοπικό αρχείο (file://), πέφτει πίσω στη σταθερή IP.
+
+const HA_URL  = (location.protocol === 'http:' || location.protocol === 'https:')
+
+  ? location.origin
+
+  : "http://your-ha-ip:8123";
+
+const HA_TOKEN = "YOUR_LONG_LIVED_TOKEN_HERE";
+
+const POLL_MS = 10000;
+
+const USE_WEBSOCKET = true;   // true = ζωντανό push από HA (γρήγορο). false = μόνο poll
+
+const RENDER_MS = 1000;       // πόσο συχνά ανανεώνεται η εικόνα (1000 ms = 1 φορά/δευτ.)
+
+const HISTORY_HOURS = 24;
+
+const HISTORY_MAX_POINTS = 96;
+
+const COLUMNS = [
+
+  // ====== ΠΡΑΓΜΑΤΙΚΕΣ ΚΟΛΩΝΕΣ (entity IDs ίδια με το home_assistant_kolones.yaml) ======
+
+  { id:1, name:"Κολώνα 1", street:"Πλατεία Γεωργίου", lat:38.2472, lng:21.7335, color:"#4f98a3",
+
+    live:true, availability:"select.col1_led_mode",
+
+    entities:{ temperature:"sensor.col1_temperature", humidity:"sensor.col1_humidity", pressure:"sensor.col1_pressure",
+
+      gas:"sensor.kolona_1_kolona_1_aerio_analog", gas_bme:"sensor.kolona_1_kolona_1_aerio_bme",
+
+      ldr:"sensor.col1_ldr", tof:"sensor.kolona_1_col1_tof", ultrasonic:"sensor.kolona_1_col1_us",
+
+      motion:"sensor.kolona_1_kolona_1_kinese_raw", rain:"sensor.kolona_1_kolona_1_brokhe",
+
+      led_state:"binary_sensor.kolona_1_col1_led", led_mode:"select.col1_led_mode" } },
+
+  { id:2, name:"Κολώνα 2", street:"Αγ. Νικολάου 12", lat:38.2455, lng:21.7358, color:"#e8af34",
+
+    live:true, availability:"select.col2_led_mode",
+
+    entities:{ temperature:"sensor.col2_temperature", humidity:"sensor.col2_humidity", pressure:"sensor.col2_pressure",
+
+      gas:"sensor.col2_gas", tof:"sensor.kolona_2_col2_tof", ultrasonic:"sensor.kolona_2_col2_us",
+
+      ldr:"sensor.col2_ldr", ldr2:"sensor.col2_ldr2",
+
+      water_level:"sensor.col2_water_level", audio:"sensor.col2_audio",
+
+      light_level:"sensor.col2_light_level", lora_payload:"sensor.kolona_2_col2_lora",
+
+      led_state:"binary_sensor.kolona_2_col2_led", led_mode:"select.col2_led_mode" } },
+
+  { id:3, name:"Κολώνα 3", street:"Γούναρη 45", lat:38.2466, lng:21.7347, color:"#6daa45",
+
+    live:true, availability:"select.col3_led_mode",
+
+    entities:{ temperature:"sensor.col3_temperature", humidity:"sensor.col3_humidity", pressure:"sensor.col3_pressure",
+
+      gas:"sensor.kolona_3_kolona_3_aerio", eco2:"sensor.kolona_3_kolona_3_eco2", tvoc:"sensor.kolona_3_kolona_3_tvoc",
+
+      tof:"sensor.kolona_3_col3_tof", ultrasonic:"sensor.kolona_3_col3_us",
+
+      ldr:"sensor.col3_ldr", ldr2:"sensor.kolona_3_kolona_3_ldr2",
+
+      led_state:"binary_sensor.kolona_3_col3_led", led_mode:"select.col3_led_mode" } },
+
+  /* ---- Ψηφιακές (demo) κολώνες: live προσομοίωση, χωρίς MQTT ---- */
+
+  { id:4, name:"Κολώνα 4", street:"Λιμάνι Πάτρας", lat:38.2436, lng:21.7292, color:"#c084fc", live:true, fake:true, bias:0.85, entities:{} },
+
+  { id:5, name:"Κολώνα 5", street:"Πλατεία Όλγας", lat:38.2438, lng:21.7392, color:"#38bdf8", live:true, fake:true, bias:0.50, entities:{} },
+
+  { id:6, name:"Κολώνα 6", street:"Οδός Κορίνθου", lat:38.2503, lng:21.7406, color:"#fb7185", live:true, fake:true, bias:0.72, entities:{} },
+
+  { id:7, name:"Κολώνα 7", street:"Δασύλλιο", lat:38.2521, lng:21.7305, color:"#34d399", live:true, fake:true, bias:0.18, entities:{} },
+
+  { id:8, name:"Κολώνα 8", street:"Ακτή Δυμαίων", lat:38.2401, lng:21.7351, color:"#f59e0b", live:true, fake:true, bias:0.40, entities:{} },
+
+  { id:9, name:"Κολώνα 9", street:"Πανεπιστήμιο Πατρών", lat:38.2885, lng:21.7886, color:"#a3e635", live:true, fake:true, bias:0.28, entities:{} },
+
+  { id:10, name:"Κολώνα 10", street:"Γέφυρα Ρίου", lat:38.2960, lng:21.7790, color:"#f472b6", live:true, fake:true, bias:0.63, entities:{} }
+
+];
+
+const HIST_KEYS = ["temperature","humidity","eco2","ldr","pressure","lux"];
+
+const LED_SELECT_ENTITY = "select.col1_led_mode";
+
+const COL2_LED_SWITCH = "switch.col2_led";
+
+// ===== Parking (HC-SR04) =====
+
+const PARKING_COLUMNS = [2,3];        // κολώνες με HC-SR04 για θέση parking
+
+// Όρια ανά κολόνα (cm) με νεκρή ζώνη ώστε να μην τρεμοπαίζει. Μετρήσεις μακέτας 06/10/2026:
+//   Κ2 (άλλος αισθητήρας): άδειο 24-28, αντικείμενο στα ~15cm -> 15-23 (μία φορά 48 = σκουπίδι).
+//   Κ3: άδειο 13.1-13.6, αντικείμενο στα 9cm -> 4.6-9.7.
+// d <= occ_cm -> ΠΙΑΣΜΕΝΟ, d >= free_cm -> ΕΛΕΥΘΕΡΟ, ενδιάμεσα κρατάει την προηγούμενη κατάσταση.
+// -1 (καμία ηχώ) = ΕΛΕΥΘΕΡΟ. Τιμές πάνω από max_cm αγνοούνται (μεμονωμένα σκουπίδια).
+const PARKING_CFG = { 2:{ occ_cm:20, free_cm:23.5, max_cm:40 }, 3:{ occ_cm:11.5, free_cm:12.5 } };
+
+const PARKING_DEMO = false;           // demo εναλλαγή όταν δεν έρχεται πραγματικό US (αυτόματα σβήνει μόλις έρθει live τιμή)
+
+function hasParking(col){ return PARKING_COLUMNS.includes(col.id); }
+
+function parkingState(col){ const s=state[col.id]; const d=s.ultrasonic; if(d===null||d===undefined||!Number.isFinite(Number(d))) return {known:false}; const dist=Number(d); const cfg=PARKING_CFG[col.id]||{occ_cm:50,free_cm:60}; if(s._parkHyst===undefined) s._parkHyst=false; if(dist<0) s._parkHyst=false; else if(cfg.max_cm && dist>cfg.max_cm) {} else if(dist<=cfg.occ_cm) s._parkHyst=true; else if(dist>=cfg.free_cm) s._parkHyst=false; return {known:true, occupied:s._parkHyst, dist}; }
+
+const state = {}; let myMap = null, activeCharts = {}, currentView = 'map', currentDashCol = 1, dark = true, pollutionLayer = null, pollutionOn = false; const markerRefs = {}; let dashBuiltFor = null, haWs = null, wsMsgId = 1, ent2col = null, allStatesCache = null, cmpCharts = {}, cmpBuilt = false;
+
+function diagSuggest(c, allIds){ const re=new RegExp('(col|pole|kolona)0?'+c.id+'(?![0-9])','i'); return allIds.filter(x=>re.test(x)); }
+
+function runDiagnostics(){ if(!allStatesCache){ alert('Δεν υπάρχουν ακόμη δεδομένα από το Home Assistant. Δοκίμασε ξανά σε λίγα δευτερόλεπτα.'); return; } const byId=new Map(allStatesCache.map(e=>[e.entity_id,e])); const allIds=allStatesCache.map(e=>e.entity_id); let html=''; for(const c of COLUMNS){ if(c.fake) continue; let rows=''; for(const [k,eid] of Object.entries(c.entities||{})){ const ent=byId.get(eid); const ok=ent&&!unavailable(ent); rows+=`<div class="diag-row ${ok?'ok':'bad'}"><span>${k}</span><code>${eid}</code><b>${ok?ent.state:'ΛΕΙΠΕΙ'}</b></div>`; } const found=diagSuggest(c,allIds); html+=`<div class="diag-col"><div class="diag-h" style="color:${c.color}">${c.name} — ${c.street}</div>${rows}<div class="diag-all"><b>Όλα τα entities που βλέπω για αυτή την κολώνα:</b><br>${found.length?found.map(x=>`<code>${x}</code>`).join(''):'<i>κανένα — έλεγξε όνομα συσκευής / δίκτυο / token</i>'}</div></div>`; } showDiag(html); }
+
+function showDiag(html){ let o=document.getElementById('diag-overlay'); if(!o){ o=document.createElement('div'); o.id='diag-overlay'; o.className='diag-overlay'; o.addEventListener('click',e=>{ if(e.target===o) closeDiag(); }); document.body.appendChild(o); } o.innerHTML=`<div class="diag-box"><div class="diag-top"><div class="diag-title">🔍 Έλεγχος αισθητήρων</div><button class="diag-close" onclick="closeDiag()">Κλείσιμο</button></div><p style="font-size:var(--text-xs);color:var(--color-text-muted);margin-bottom:14px;line-height:1.5">Πράσινο = παίρνει τιμή. Κόκκινο «ΛΕΙΠΕΙ» = το entity_id στον κώδικα δεν ταιριάζει με αυτό του HA. Σύγκρινε με τη λίστα «όλα τα entities» από κάτω και διόρθωσε το αντίστοιχο id στο <code>COLUMNS</code>.</p>${html}</div>`; o.style.display='flex'; }
+
+function closeDiag(){ const o=document.getElementById('diag-overlay'); if(o) o.style.display='none'; }
+
+function initState(){ COLUMNS.forEach(c => state[c.id] = { temperature:null, humidity:null, pressure:null, gas:null, gas_bme:null, eco2:null, tvoc:null, tof:null, ultrasonic:null, ldr:null, ldr2:null, lux:null, uv:null, motion:null, rain:null, water_level:null, flame:null, audio:null, light_level:null, lora_payload:null, air_quality:null, led_state:'—', led_state_text:'—', led_mode:'—', led_switch:false, online:false, ts:{}, history:Object.fromEntries(HIST_KEYS.map(k=>[k,[]])) }); }
+
+function haHeaders(){ return { Authorization:`Bearer ${HA_TOKEN}` }; }
+
+async function haGet(path){ const r = await fetch(HA_URL + path, { headers: haHeaders() }); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
+
+async function haPost(path, body){ const r = await fetch(HA_URL + path, { method:'POST', headers:{ ...haHeaders(), 'Content-Type':'application/json' }, body: JSON.stringify(body) }); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
+
+function num(x){ const v = parseFloat(x); return Number.isFinite(v) ? v : null; }
+
+function fmt(v,d=1){ return v===null||v===undefined||!Number.isFinite(Number(v)) ? '—' : Number(v).toFixed(d); }
+
+function ago(ts){ if(!ts) return ''; const s=Math.round((Date.now()-ts)/1000); if(s<5) return 'τώρα'; if(s<60) return `${s}δ πριν`; return `${Math.floor(s/60)}λ πριν`; }
+
+function stale(ts){ return !ts || Date.now()-ts > 120000; }
+
+function unavailable(ent){ return !ent || ent.state==='unavailable' || ent.state==='unknown'; }
+
+function pushHist(s, key, v){ if(!s.history[key]) s.history[key]=[]; const h = s.history[key]; h.push({ t:Date.now(), v }); if(h.length > HISTORY_MAX_POINTS) h.shift(); }
+
+function downsample(pts, max){ if(pts.length <= max) return pts; const step = pts.length / max, out = []; for(let i=0; i<max; i++) out.push(pts[Math.floor(i*step)]); return out; }
+
+function setStatus(cls, text){ const dot = document.getElementById('status-dot'); dot.className = `mqtt-dot ${cls}`; document.getElementById('status-pill').textContent = text; }
+
+/* ---------- ROUTING: deep-link μέσω hash (#dashboard-1 / #overview / #map / ,embed) ---------- */
+
+function parseHash(){ const raw=(location.hash||'').replace(/^#/,''); const parts=raw.split(/[,&]/).map(s=>s.trim()).filter(Boolean); let view=null,col=null,embed=false; for(const p of parts){ if(p==='embed') embed=true; else if(p==='map'||p==='overview'||p==='comparison') view=p; else { const m=p.match(/^(?:dashboard|dash|col|kolona)-?(\d+)$/i); if(m){ view='dashboard'; col=parseInt(m[1],10); } } } return { view, col, embed }; }
+
+function applyInitialRoute(){ const r=parseHash(); if(r.embed) document.body.classList.add('embed'); if(r.view==='dashboard' && r.col && COLUMNS.some(c=>c.id===r.col)){ openDashboard(r.col); } else if(r.view==='overview'){ showView('overview'); } else if(r.view==='comparison'){ showView('comparison'); } else { showView('map'); } }
+
+function syncHash(){ const embed=document.body.classList.contains('embed')?',embed':''; let h='map'; if(currentView==='overview') h='overview'; else if(currentView==='comparison') h='comparison'; else if(currentView==='dashboard') h='dashboard-'+currentDashCol; try{ history.replaceState(null,'','#'+h+embed); }catch(_){ try{ location.hash=h+embed; }catch(__){} } }
+
+/* ---------- Live προσομοίωση ψηφιακών κολωνών ---------- */
+
+function rw(cur,min,max,step){ if(cur===null||cur===undefined||!Number.isFinite(cur)) cur=(min+max)/2; let v=cur+(Math.random()-0.5)*step; return Math.max(min,Math.min(max,v)); }
+
+function simulateFake(){ const now=Date.now(); for(const c of COLUMNS){ if(!c.fake) continue; const s=state[c.id]; const b=(c.bias===undefined?0.4:c.bias); s.temperature=rw(s.temperature,8,34,0.6); s.humidity=rw(s.humidity,30,92,2.2); s.pressure=rw(s.pressure,1004,1024,0.4); s.eco2=rw(s.eco2,420+b*260,640+b*1100,38); s.tvoc=rw(s.tvoc,40+b*120,180+b*700,22); s.gas=rw(s.gas,30+b*40,120+b*180,9); s.ldr=rw(s.ldr,40,960,55); s.ldr2=rw(s.ldr2,40,960,55); s.air_quality=rw(s.air_quality,10+b*40,40+b*150,8); s.online=true; ['temperature','humidity','pressure','eco2','tvoc','gas','ldr','ldr2','air_quality'].forEach(k=>s.ts[k]=now); HIST_KEYS.forEach(k=>{ if(s[k]!==null && s[k]!==undefined) pushHist(s,k,s[k]); }); } if(PARKING_DEMO){ for(const id of PARKING_COLUMNS){ const s=state[id]; if(s._parkLeft===undefined){ s._parkOcc=Math.random()<0.5; s._parkLeft=6+Math.floor(Math.random()*12); s._simDist=s._parkOcc?30:180; } s._parkLeft--; if(s._parkLeft<=0){ s._parkOcc=!s._parkOcc; s._parkLeft=6+Math.floor(Math.random()*16); } s._simDist = s._parkOcc ? rw(s._simDist,14,44,5) : rw(s._simDist,120,260,14); s.ultrasonic=s._simDist; s.ts.ultrasonic=now; } } }
+
+/* ---------- Δείκτης ρύπανσης + overlay χάρτη ---------- */
+
+function clamp01(v){ return Math.max(0,Math.min(100,v)); }
+
+function pollutionIndex(c){ const s=state[c.id]; const parts=[]; if(s.eco2!==null&&s.eco2!==undefined) parts.push(clamp01((s.eco2-420)/(1050-420)*100)); if(s.tvoc!==null&&s.tvoc!==undefined) parts.push(clamp01(s.tvoc/7)); if(s.air_quality!==null&&s.air_quality!==undefined) parts.push(clamp01(s.air_quality/1.5)); if((s.eco2===null||s.eco2===undefined)&&s.gas!==null&&s.gas!==undefined) parts.push(clamp01(s.gas/2.2)); if(!parts.length) return 0; const mx=Math.max(...parts), av=parts.reduce((a,b)=>a+b,0)/parts.length; return clamp01(0.65*mx+0.35*av); }
+
+function pollutionColor(v){ return v<20?'#27c24c':v<40?'#e8c534':v<65?'#f5872f':'#e23b3b'; }
+
+function pollutionLabel(v){ return v<20?'Καλή':v<40?'Μέτρια':v<65?'Επιβαρυμένη':'Υψηλή'; }
+
+function updatePollution(){ if(!pollutionLayer) return; pollutionLayer.clearLayers(); if(!pollutionOn) return; for(const c of COLUMNS){ const v=pollutionIndex(c); const col=pollutionColor(v); [{r:360,o:0.12},{r:230,o:0.20},{r:130,o:0.32},{r:60,o:0.46}].forEach(ring=>{ L.circle([c.lat,c.lng],{radius:ring.r,stroke:false,fillColor:col,fillOpacity:ring.o,interactive:false}).addTo(pollutionLayer); }); } }
+
+function togglePollution(){ pollutionOn=!pollutionOn; const btn=document.getElementById('pollution-toggle'); const leg=document.getElementById('poll-legend'); if(btn) btn.classList.toggle('active',pollutionOn); if(leg) leg.classList.toggle('show',pollutionOn); updatePollution(); }
+
+function applyEntityToState(colId, k, ent){ if(unavailable(ent)) return; const s=state[colId]; const now=Date.now(); if(k==='led_state'){ s.led_state=ent.state; s.ts[k]=now; return; } if(k==='led_state_text'){ s.led_state_text=ent.state; s.ts[k]=now; return; } if(k==='led_mode'){ s.led_mode=ent.state; s.ts[k]=now; return; } if(k==='led_switch'){ s.led_switch=ent.state==='on'; s.ts[k]=now; return; } if(k==='lora_payload'){ s.lora_payload=ent.state; s.ts[k]=now; return; } if(k==='motion'||k==='rain'){ s[k]=ent.state; s.ts[k]=now; return; } const v=num(ent.state); if(v===null) return; s[k]=v; s.ts[k]=now; pushHist(s,k,v); }
+
+function liveRender(){ updatePollution(); updateMarkers(); if(currentView==='overview') buildOverview(); if(currentView==='comparison'){ if(!cmpBuilt) buildComparison(); else updateComparison(); } if(currentView==='dashboard'){ if(dashBuiltFor!==currentDashCol) renderDashboard(currentDashCol); else updateDashboardLive(currentDashCol); } }
+
+let _renderPending=false;
+
+function requestLiveRender(){ if(_renderPending) return; _renderPending=true; setTimeout(()=>{ _renderPending=false; liveRender(); }, 200); }
+
+function liveTick(){ simulateFake(); liveRender(); }
+
+/* ---- WebSocket: ζωντανό push από Home Assistant ---- */
+
+function buildEntityIndex(){ ent2col=new Map(); for(const c of COLUMNS){ if(c.fake) continue; for(const [k,eid] of Object.entries(c.entities||{})) ent2col.set(eid,{id:c.id,key:k}); if(c.availability) ent2col.set(c.availability,{id:c.id,key:'__avail__'}); } }
+
+function wsConnect(){ if(!USE_WEBSOCKET) return; let ws; try{ ws=new WebSocket(HA_URL.replace(/^http/i,'ws')+'/api/websocket'); }catch(e){ return; } haWs=ws;
+
+  ws.onmessage=(evt)=>{ let m; try{ m=JSON.parse(evt.data); }catch(_){ return; }
+
+    if(m.type==='auth_required'){ ws.send(JSON.stringify({type:'auth',access_token:HA_TOKEN})); return; }
+
+    if(m.type==='auth_invalid'){ setStatus('error','WebSocket: μη έγκυρο token'); return; }
+
+    if(m.type==='auth_ok'){ setStatus('connected','Live (WebSocket)'); ws.send(JSON.stringify({id:wsMsgId++,type:'subscribe_events',event_type:'state_changed'})); return; }
+
+    if(m.type==='event' && m.event && m.event.event_type==='state_changed'){ const d=m.event.data; const map=ent2col&&ent2col.get(d.entity_id); if(!map) return; const ent=d.new_state; if(map.key==='__avail__'){ state[map.id].online=!unavailable(ent); } else { applyEntityToState(map.id,map.key,ent); if(ent && !unavailable(ent)) state[map.id].online=true; } const t=new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); setStatus('connected',`Live (WebSocket) · ${t}`); requestLiveRender(); } };
+
+  ws.onclose=()=>{ haWs=null; setTimeout(wsConnect, 3000); };
+
+  ws.onerror=()=>{ try{ ws.close(); }catch(_){} }; }
+
+async function refreshFromHA(){ let all=null; try{ all = await haGet('/api/states'); }catch(err){ all=null; } if(all){ allStatesCache = all; const byId = new Map(all.map(e => [e.entity_id, e])); for(const c of COLUMNS){ if(c.fake) continue; const s = state[c.id]; if(c.availability){ const av = byId.get(c.availability); s.online = !unavailable(av); } for(const [k, eid] of Object.entries(c.entities||{})){ applyEntityToState(c.id, k, byId.get(eid)); } } if(!(haWs && haWs.readyState===1)){ const t = new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); setStatus('connected', `Live από Home Assistant · ${t}`); } } else if(!(haWs && haWs.readyState===1)){ setStatus('error','HA εκτός — προσομοίωση ενεργή'); } liveRender(); }
+
+async function loadHistory(){ for(const c of COLUMNS){ if(c.fake) continue; const keys = colMetrics(c).charts; const map = {}; keys.forEach(k=>{ const eid=(c.entities||{})[k]; if(eid) map[eid]=k; }); const ids = Object.keys(map); if(!ids.length) continue; const start = new Date(Date.now() - HISTORY_HOURS*3600*1000).toISOString(); try{ const data = await haGet(`/api/history/period/${start}?filter_entity_id=${ids.join(',')}&minimal_response&no_attributes`); for(const series of data){ if(!series.length) continue; const eid = series[0].entity_id; const key = map[eid]; if(!key) continue; const pts = series.map(p => ({ t:new Date(p.last_changed || p.last_updated).getTime(), v:num(p.state) })).filter(p => p.v !== null); if(pts.length) state[c.id].history[key] = downsample(pts, HISTORY_MAX_POINTS); } }catch(_){} } if(currentView === 'dashboard') renderDashboard(currentDashCol); }
+
+async function sendLEDCmd(cmd){ document.querySelectorAll('#led-mode-btns .led-mode-btn').forEach(b => b.classList.toggle('active', b.textContent === cmd)); const cc = COLUMNS.find(x=>x.id===currentDashCol); const ent = (cc && cc.entities && cc.entities.led_mode) ? cc.entities.led_mode : LED_SELECT_ENTITY; try{ await haPost('/api/services/select/select_option', { entity_id: ent, option: cmd }); setTimeout(refreshFromHA, 1200); }catch(err){ alert('Η εντολή δεν στάλθηκε στο Home Assistant.'); } }
+
+async function toggleCol2LED(turnOn){ try{ await haPost(`/api/services/switch/${turnOn ? 'turn_on' : 'turn_off'}`, { entity_id: COL2_LED_SWITCH }); setTimeout(refreshFromHA, 1200); }catch(err){ alert('Η εντολή ON/OFF για την Κολώνα 2 δεν στάλθηκε. Έλεγξε token, entity_id και Home Assistant.'); } }
+
+function sensorName(k){ return {temperature:'Θερμοκρασία',humidity:'Υγρασία',pressure:'Πίεση',gas:'Gas',eco2:'CO₂',tvoc:'TVOC',tof:'ToF',ultrasonic:'US',ldr:'LDR1',ldr2:'LDR2',water_level:'Water Level',flame:'Flame',audio:'Audio',light_level:'Light Level',lux:'Lux',uv:'UV'}[k] || k; }
+
+function parkingBanner(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const bg=!known?'var(--color-surface-offset)':(occ?'rgba(226,59,59,0.13)':'rgba(39,194,76,0.13)'); const label=!known?'Άγνωστο':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'❓':(occ?'🚗':'🅿️'); const sub=known?`HC-SR04 · ${fmt(p.dist,0)} cm (όριο ${PARKING_THRESHOLD_CM} cm)`:'HC-SR04 · χωρίς τιμή'; return `<div class="park-banner" style="background:${bg};border-color:${color}"><span class="park-ico">${ico}</span><div><div class="park-label" style="color:${color}">Θέση parking: ${label}</div><div class="park-sub">${sub}</div></div></div>`; }
+
+function parkingExtraCard(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const label=!known?'—':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'🅿️':(occ?'🚗':'🅿️'); return `<div class="extra-card" style="border-color:${color}"><div class="extra-icon">${ico}</div><div><div class="extra-label">Θέση parking (HC-SR04)</div><div class="extra-val" style="color:${color}">${label}${known?` · ${fmt(p.dist,0)} cm`:''}</div></div></div>`; }
+
+function parkOvBadge(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const label=!known?'—':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'🅿️':(occ?'🚗':'🅿️'); return `<div class="ov-poll" style="margin-left:6px;background:${color}22;color:${color}">${ico} Parking: ${label}</div>`; }
+
+function buildPopup(col){ const s = state[col.id]; const pv = pollutionIndex(col); return `<div class="popup-inner"><div class="popup-accent" style="background:${col.color}"></div><div class="popup-header"><div class="popup-dot" style="background:${col.color}"></div><div><div class="popup-title">${col.name}${col.fake?' · demo':''}</div><div class="popup-subtitle">${col.street} — Πάτρα</div></div></div><div class="popup-coords"><div class="coord-row"><span class="coord-label">Γεωγρ. Πλάτος</span><span class="coord-val">${col.lat.toFixed(5)}° N</span></div><div class="coord-row"><span class="coord-label">Γεωγρ. Μήκος</span><span class="coord-val">${col.lng.toFixed(5)}° E</span></div></div><div class="popup-metrics">${`<div class="popup-metric"><div class="pm-label">Θερμοκρ.</div><div class="pm-val" style="color:${col.color}">${fmt(s.temperature)} °C</div></div><div class="popup-metric"><div class="pm-label">Υγρασία</div><div class="pm-val" style="color:${col.color}">${fmt(s.humidity,0)}%</div></div>` + ((s.eco2!==null&&s.eco2!==undefined) ? `<div class="popup-metric"><div class="pm-label">CO₂</div><div class="pm-val" style="color:${col.color}">${fmt(s.eco2,0)} ppm</div></div>` : ((s.lux!==null&&s.lux!==undefined) ? `<div class="popup-metric"><div class="pm-label">Lux</div><div class="pm-val" style="color:${col.color}">${fmt(s.lux,0)} lx</div></div>` : ((s.gas!==null&&s.gas!==undefined) ? `<div class="popup-metric"><div class="pm-label">Gas</div><div class="pm-val" style="color:${col.color}">${fmt(s.gas,0)}</div></div>` : `<div class="popup-metric"><div class="pm-label">Air Q</div><div class="pm-val" style="color:${col.color}">${fmt(s.air_quality,0)}</div></div>`))) + `<div class="popup-metric"><div class="pm-label">Φωτισμός</div><div class="pm-val" style="color:${col.color}">${fmt(s.ldr,0)}</div></div>`}</div>${hasParking(col)?parkingBanner(col):''}<div class="popup-poll"><div class="popup-slider-head"><span class="popup-slider-label">Δείκτης ρύπανσης</span><span class="popup-slider-value" style="color:${pollutionColor(pv)}">${pollutionLabel(pv)} · ${Math.round(pv)}</span></div><div class="poll-meter"><div class="poll-meter-marker" style="left:${Math.round(pv)}%;border-color:${pollutionColor(pv)}"></div></div><div class="poll-meter-scale"><span>0</span><span>40</span><span>65</span><span>100</span></div><div class="popup-slider-note">Εκτίμηση από CO₂/αέρια. Κατέβα πιο κάτω για περισσότερες τιμές.</div></div><details class="popup-more"><summary><span>Περισσότερες τιμές</span><span class="popup-more-label">Άνοιγμα</span></summary><div class="popup-more-grid"><div class="popup-more-card"><div class="pm-label">Πίεση</div><div class="pm-val">${fmt(s.pressure)} hPa</div></div><div class="popup-more-card"><div class="pm-label">ToF</div><div class="pm-val">${fmt(s.tof,0)} mm</div></div><div class="popup-more-card"><div class="pm-label">Ultrasonic</div><div class="pm-val">${fmt(s.ultrasonic,1)} cm</div></div>${(s.eco2!==null&&s.eco2!==undefined)?`<div class="popup-more-card"><div class="pm-label">TVOC</div><div class="pm-val">${fmt(s.tvoc,0)} ppb</div></div><div class="popup-more-card"><div class="pm-label">Gas</div><div class="pm-val">${fmt(s.gas,0)}</div></div><div class="popup-more-card"><div class="pm-label">LDR 2</div><div class="pm-val">${fmt(s.ldr2,0)}</div></div>`:`<div class="popup-more-card"><div class="pm-label">UV</div><div class="pm-val">${fmt(s.uv,1)}</div></div><div class="popup-more-card"><div class="pm-label">Air Q</div><div class="pm-val">${fmt(s.air_quality,0)}</div></div><div class="popup-more-card"><div class="pm-label">Gas (BME)</div><div class="pm-val">${fmt(s.gas_bme,0)} Ω</div></div>`}${col.id===2?`<div class="popup-more-card"><div class="pm-label">🛢️ Gas</div><div class="pm-val">${fmt(s.gas,0)}</div></div><div class="popup-more-card"><div class="pm-label">💧 Water Level</div><div class="pm-val">${fmt(s.water_level,0)}</div></div><div class="popup-more-card"><div class="pm-label">🔥 Flame</div><div class="pm-val">${fmt(s.flame,0)}</div></div><div class="popup-more-card"><div class="pm-label">🔊 Audio</div><div class="pm-val">${fmt(s.audio,0)}</div></div><div class="popup-more-card"><div class="pm-label">📶 LoRa</div><div class="pm-val" style="font-size:var(--text-xs);word-break:break-all">${s.lora_payload || '—'}</div></div>`:''}<div class="popup-more-card"><div class="pm-label">LED state</div><div class="pm-val">${s.led_state || '—'}</div></div><div class="popup-more-card"><div class="pm-label">LED mode</div><div class="pm-val">${s.led_mode || '—'}</div></div></div></details><button class="btn-dashboard" id="open-dash-${col.id}">Άνοιξε Dashboard</button></div>`; }
+
+// ===== Εικονίδια markers ανά επίπεδο ρύπανσης =====
+
+const GLYPH_LEAF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>';
+
+const GLYPH_PIN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+
+const GLYPH_SMOKE='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18a4 4 0 0 1-.6-7.95 5.5 5.5 0 0 1 10.9-1 4.5 4.5 0 0 1-.3 8.95H6z"/><circle cx="9" cy="21.5" r="1.3"/><circle cx="13.5" cy="22" r="1.1"/></svg>';
+
+function pollGlyph(v){ return v<25?GLYPH_LEAF : v<55?GLYPH_PIN : GLYPH_SMOKE; }
+
+function parkBadgeHtml(col){ if(!hasParking(col)) return ''; const p=parkingState(col); if(!p.known) return '<span class="cm-park" style="background:#9a9a9a">P</span>'; return `<span class="cm-park" style="background:${p.occupied?'#e23b3b':'#27c24c'}">P</span>`; }
+
+function colIconHtml(col){ const v=pollutionIndex(col); const ring=pollutionColor(v); const alert=v>=65?' alert':''; return `<div class="cm${col.fake?' fake':''}${alert}" style="--ring:${ring};background:${col.color}">${pollGlyph(v)}${parkBadgeHtml(col)}</div>`; }
+
+function makeColIcon(col){ return L.divIcon({className:'',html:colIconHtml(col),iconSize:[34,34],iconAnchor:[17,34],popupAnchor:[0,-36]}); }
+
+function updateMarkers(){ for(const c of COLUMNS){ const m=markerRefs[c.id]; if(m) m.setIcon(makeColIcon(c)); } }
+
+function initMap(){ myMap = L.map('map',{center:[38.2465,21.7347],zoom:16,zoomControl:true}); window._baseTiles = L.tileLayer(tileUrl(),{attribution:'© Esri · © OpenStreetMap contributors',maxNativeZoom:16,maxZoom:19}).addTo(myMap); applyMapTheme(); pollutionLayer = L.layerGroup().addTo(myMap); COLUMNS.forEach(col=>{ const icon = makeColIcon(col); const marker = L.marker([col.lat,col.lng],{icon}).addTo(myMap); markerRefs[col.id]=marker; marker.on('click',()=>{ const popup = L.popup({closeButton:true,maxWidth:300}).setLatLng([col.lat,col.lng]).setContent(buildPopup(col)); popup.openOn(myMap); setTimeout(()=>{ const btn=document.getElementById(`open-dash-${col.id}`); if(btn) btn.onclick=()=>{popup.close(); openDashboard(col.id)}; },50); }); }); }
+
+function tileUrl(){ const B='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_'; return dark ? B+'Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}' : B+'Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'; }
+function applyMapTheme(){ if(!myMap) return; myMap.getContainer().style.filter=''; if(window._baseTiles) window._baseTiles.setUrl(tileUrl()); }
+
+function showView(v){ currentView = v; document.getElementById('map-view').classList.toggle('hidden', v!=='map'); document.getElementById('dashboard-view').classList.toggle('active', v==='dashboard'); document.getElementById('overview-view').classList.toggle('active', v==='overview'); const cmpV=document.getElementById('comparison-view'); if(cmpV) cmpV.classList.toggle('active', v==='comparison'); document.getElementById('btn-map').classList.toggle('active', v==='map'); document.getElementById('btn-ov').classList.toggle('active', v==='overview'); const bc=document.getElementById('btn-cmp'); if(bc) bc.classList.toggle('active', v==='comparison'); if(v==='overview') buildOverview(); if(v==='comparison'){ cmpBuilt=false; buildComparison(); } if(v==='map') requestAnimationFrame(()=>{ if(myMap) myMap.invalidateSize(); setTimeout(()=>myMap&&myMap.invalidateSize(),250); }); syncHash(); }
+
+function openDashboard(id){ currentDashCol=id; showView('dashboard'); renderDashboard(id); const dv=document.getElementById('dashboard-view'); if(dv) dv.scrollTop=0; }
+
+function mkChart(id, hist, color, unit){ const ctx = document.getElementById(id); if(!ctx) return; const grid = dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)'; const txt  = dark ? '#797876' : '#7a7974'; activeCharts[id] = new Chart(ctx,{type:'line', data:{ labels:hist.map(p=>new Date(p.t).toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'})), datasets:[{data:hist.map(p=>p.v),borderColor:color,backgroundColor:color+'20',fill:true,tension:0.4,borderWidth:2,pointRadius:0,pointHoverRadius:4}] }, options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false}, plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw} ${unit}`}}}, scales:{x:{ticks:{color:txt,maxTicksLimit:8,font:{size:10}},grid:{color:grid}},y:{ticks:{color:txt,font:{size:10}},grid:{color:grid}}}, animation:{duration:0}}}); }
+
+const META = {
+
+  temperature:{label:'Θερμοκρασία',unit:'°C',d:1},
+
+  humidity:{label:'Υγρασία',unit:'%',d:0},
+
+  eco2:{label:'CO₂',unit:'ppm',d:0},
+
+  pressure:{label:'Πίεση',unit:'hPa',d:1},
+
+  ldr:{label:'LDR 1',unit:'',d:0},
+
+  ldr2:{label:'LDR 2',unit:'',d:0},
+
+  gas:{label:'Gas',unit:'',d:0},
+
+  tvoc:{label:'TVOC',unit:'ppb',d:0},
+
+  audio:{label:'Audio',unit:'',d:0},
+
+  light_level:{label:'Φωτεινότητα',unit:'',d:0},
+
+  water_level:{label:'💧 Water Level',unit:'',d:0},
+
+  flame:{label:'🔥 Flame',unit:'',d:0},
+
+  air_quality:{label:'Air quality',unit:'',d:0},
+
+  lux:{label:'Φωτεινότητα',unit:'lx',d:0},
+
+  uv:{label:'UV Index',unit:'',d:1},
+
+  gas_bme:{label:'Gas (BME)',unit:'Ω',d:0}
+
+};
+
+function colMetrics(c){
+
+  if(c.fake) return { kpis:['temperature','humidity','eco2','pressure','ldr','ldr2'], charts:['temperature','humidity','eco2','ldr'] };
+
+  if(c.id===1) return { kpis:['temperature','humidity','pressure','gas','gas_bme','ldr'], charts:['temperature','humidity','pressure','ldr'] };
+
+  if(c.id===2) return { kpis:['temperature','humidity','pressure','gas','ldr','ldr2','water_level','flame','audio','light_level'], charts:['temperature','humidity','pressure','ldr'] };
+
+  if(c.id===3) return { kpis:['temperature','humidity','eco2','tvoc','pressure','ldr'], charts:['temperature','humidity','eco2','ldr'] };
+
+  return { kpis:['temperature','humidity','eco2','pressure'], charts:['temperature','humidity','eco2','ldr'] };
+
+}
+
+function renderDashValues(id){
+
+  const c = COLUMNS.find(x=>x.id===id); const s = state[id];
+
+  document.getElementById('dash-dot').style.background = c.color;
+
+  document.getElementById('dash-name').textContent = c.name + (c.fake?' · demo':'');
+
+  document.getElementById('dash-sub').textContent = `${c.street} · ${c.lat.toFixed(5)}° N, ${c.lng.toFixed(5)}° E`;
+
+  const isLive = !!c.live; const M = colMetrics(c); const pv = pollutionIndex(c);
+
+  const ph = document.getElementById('dash-hero'); if(ph) ph.innerHTML = `<div class="dash-hero-row"><span class="dash-poll-chip" style="background:${pollutionColor(pv)}22;color:${pollutionColor(pv)};border-color:${pollutionColor(pv)}">◍ Ρύπανση: ${pollutionLabel(pv)} · ${Math.round(pv)}</span>${isLive?`<span style="font-size:var(--text-xs);color:var(--color-text-muted)">ανανέωση: ${ago(s.ts.temperature)||'—'}</span>`:''}</div><div class="poll-meter"><div class="poll-meter-marker" style="left:${Math.round(pv)}%;border-color:${pollutionColor(pv)}"></div></div><div class="poll-meter-scale"><span>0 Καλή</span><span>40</span><span>65</span><span>100 Υψηλή</span></div>`;
+
+  document.getElementById('kpi-grid').innerHTML = M.kpis.map(k=>`<div class="kpi-card" style="--kc:${c.color}"><div class="kpi-label">${META[k]?.label || k}</div><div class="kpi-val" style="color:${c.color}">${fmt(s[k], META[k]?.d ?? 1)}</div><div class="kpi-unit">${META[k]?.unit || ''}</div>${isLive?`<div class="kpi-freshness">${ago(s.ts[k])}</div>`:''}</div>`).join('');
+
+  document.getElementById('status-items').innerHTML = M.kpis.map(k=>`<div class="status-item"><div class="s-led ${stale(s.ts[k])?'stale':'live'}"></div>${META[k]?.label || k}: <strong style="color:var(--color-text)">${stale(s.ts[k])?'—':'Live'}</strong></div>`).join('');
+
+  const showLed = isLive && !c.fake && c.entities && c.entities.led_mode;
+
+  document.getElementById('led-control').style.display = showLed ? 'block' : 'none';
+
+  if(showLed){ const badge = document.getElementById('led-badge'); const defaultBtns = document.getElementById('led-mode-btns'); const col2Btns = document.getElementById('col2-led-btns'); defaultBtns.style.display = 'flex'; col2Btns.style.display = 'none'; const on = String(s.led_state).toUpperCase()==='ON'; badge.className = `led-badge ${on?'on':'off'}`; badge.textContent = on ? '● ON' : '● OFF'; document.querySelectorAll('#led-mode-btns .led-mode-btn').forEach(b=>b.classList.toggle('active', b.textContent===String(s.led_mode).toUpperCase())); }
+
+  const pollCard = `<div class="extra-card"><div class="extra-icon">◍</div><div><div class="extra-label">Δείκτης ρύπανσης</div><div class="extra-val" style="color:${pollutionColor(pv)}">${pollutionLabel(pv)} (${Math.round(pv)})</div></div></div>`;
+
+  const extras = id===1 ? `<div class="extra-card"><div class="extra-icon">💨</div><div><div class="extra-label">Air Quality</div><div class="extra-val">${fmt(s.air_quality,0)}</div></div></div><div class="extra-card"><div class="extra-icon">🔬</div><div><div class="extra-label">Gas (BME)</div><div class="extra-val">${fmt(s.gas_bme,0)} Ω</div></div></div><div class="extra-card"><div class="extra-icon">☀️</div><div><div class="extra-label">Φωτεινότητα</div><div class="extra-val">${fmt(s.lux,0)} lx</div></div></div><div class="extra-card"><div class="extra-icon">🟣</div><div><div class="extra-label">UV Index</div><div class="extra-val">${fmt(s.uv,1)}</div></div></div><div class="extra-card"><div class="extra-icon">🚶</div><div><div class="extra-label">Κίνηση</div><div class="extra-val">${s.motion==='on'?'Ναι':(s.motion==='off'?'Όχι':fmt(s.motion,0))}</div></div></div><div class="extra-card"><div class="extra-icon">🌧️</div><div><div class="extra-label">Βροχή</div><div class="extra-val">${s.rain==='on'?'Ναι':(s.rain==='off'?'Όχι':fmt(s.rain,0))}</div></div></div><div class="extra-card"><div class="extra-icon">📏</div><div><div class="extra-label">Απόσταση ToF</div><div class="extra-val">${fmt(s.tof,0)} mm</div></div></div><div class="extra-card"><div class="extra-icon">📡</div><div><div class="extra-label">Απόσταση US</div><div class="extra-val">${fmt(s.ultrasonic,1)} cm</div></div></div>` : id===2 ? `<div class="extra-card"><div class="extra-icon">🌡️</div><div><div class="extra-label">BME Θερμοκρασία</div><div class="extra-val">${fmt(s.temperature)} °C</div></div></div><div class="extra-card"><div class="extra-icon">💧</div><div><div class="extra-label">BME Υγρασία</div><div class="extra-val">${fmt(s.humidity,0)} %</div></div></div><div class="extra-card"><div class="extra-icon">📊</div><div><div class="extra-label">BME Πίεση</div><div class="extra-val">${fmt(s.pressure)} hPa</div></div></div><div class="extra-card"><div class="extra-icon">🛢️</div><div><div class="extra-label">Gas (MQ)</div><div class="extra-val">${fmt(s.gas,0)}</div></div></div><div class="extra-card"><div class="extra-icon">💧</div><div><div class="extra-label">Water Level</div><div class="extra-val">${fmt(s.water_level,0)}</div></div></div><div class="extra-card"><div class="extra-icon">🔥</div><div><div class="extra-label">Flame</div><div class="extra-val">${fmt(s.flame,0)}</div></div></div><div class="extra-card"><div class="extra-icon">🔊</div><div><div class="extra-label">Audio</div><div class="extra-val">${fmt(s.audio,0)}</div></div></div><div class="extra-card"><div class="extra-icon">☀️</div><div><div class="extra-label">Light Level</div><div class="extra-val">${fmt(s.light_level,0)}</div></div></div><div class="extra-card"><div class="extra-icon">📶</div><div><div class="extra-label">LoRa Payload</div><div class="extra-val" style="font-size:var(--text-xs);word-break:break-all">${s.lora_payload || '—'}</div></div></div><div class="extra-card"><div class="extra-icon">📏</div><div><div class="extra-label">ToF</div><div class="extra-val">${fmt(s.tof,0)} mm</div></div></div><div class="extra-card"><div class="extra-icon">📡</div><div><div class="extra-label">Ultrasonic</div><div class="extra-val">${fmt(s.ultrasonic,1)} cm</div></div></div>` : c.fake ? `<div class="extra-card"><div class="extra-icon">🟢</div><div><div class="extra-label">eCO₂</div><div class="extra-val">${fmt(s.eco2,0)} ppm</div></div></div><div class="extra-card"><div class="extra-icon">🧪</div><div><div class="extra-label">TVOC</div><div class="extra-val">${fmt(s.tvoc,0)} ppb</div></div></div><div class="extra-card"><div class="extra-icon">💨</div><div><div class="extra-label">Air Quality</div><div class="extra-val">${fmt(s.air_quality,0)}</div></div></div>` : `<div class="extra-card"><div class="extra-icon">🟢</div><div><div class="extra-label">eCO₂</div><div class="extra-val">${fmt(s.eco2,0)} ppm</div></div></div><div class="extra-card"><div class="extra-icon">🧪</div><div><div class="extra-label">TVOC</div><div class="extra-val">${fmt(s.tvoc,0)} ppb</div></div></div><div class="extra-card"><div class="extra-icon">🛢️</div><div><div class="extra-label">Gas</div><div class="extra-val">${fmt(s.gas,0)}</div></div></div><div class="extra-card"><div class="extra-icon">🔆</div><div><div class="extra-label">LDR 2</div><div class="extra-val">${fmt(s.ldr2,0)}</div></div></div><div class="extra-card"><div class="extra-icon">📏</div><div><div class="extra-label">Απόσταση ToF</div><div class="extra-val">${fmt(s.tof,0)} mm</div></div></div><div class="extra-card"><div class="extra-icon">📡</div><div><div class="extra-label">Απόσταση US</div><div class="extra-val">${fmt(s.ultrasonic,1)} cm</div></div></div>`;
+
+  document.getElementById('extra-grid').innerHTML = (hasParking(c)?parkingExtraCard(c):'') + extras;
+
+}
+
+function updateChartsInPlace(id){ const c=COLUMNS.find(x=>x.id===id); const s=state[id]; const M=colMetrics(c); M.charts.forEach(k=>{ const ch=activeCharts['ch-'+k]; if(!ch) return; const hist=s.history[k]||[]; ch.data.labels=hist.map(p=>new Date(p.t).toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'})); ch.data.datasets[0].data=hist.map(p=>p.v); ch.update('none'); }); }
+
+function updateDashboardLive(id){ renderDashValues(id); updateChartsInPlace(id); }
+
+function renderDashboard(id){ renderDashValues(id); const c=COLUMNS.find(x=>x.id===id); const s=state[id]; const M=colMetrics(c);
+
+  document.getElementById('charts-grid').innerHTML = M.charts.map(k=>`<div class="chart-card"><div class="chart-title">${META[k]?.label || k}${META[k]?.unit?` (${META[k].unit})`:''}</div><div class="chart-wrap"><canvas id="ch-${k}"></canvas></div></div>`).join('');
+
+  Object.values(activeCharts).forEach(ch=>{try{ch.destroy()}catch(_){}}); activeCharts = {};
+
+  M.charts.forEach(k=> mkChart('ch-'+k, s.history[k]||[], c.color, META[k]?.unit || ''));
+
+  dashBuiltFor = id;
+
+}
+
+/* ---------- ΣΥΓΚΡΙΣΗ: πολυγραμμικά γραφήματα των 3 πραγματικών κολωνών ---------- */
+
+const CMP_METRICS=[{key:'temperature',label:'Θερμοκρασία',unit:'°C',d:1},{key:'humidity',label:'Υγρασία',unit:'%',d:0},{key:'pressure',label:'Πίεση',unit:'hPa',d:1},{key:'ldr',label:'Φωτεινότητα (LDR)',unit:'',d:0}];
+
+function realCols(){ return COLUMNS.filter(c=>!c.fake); }
+
+function cmpNowHTML(key,unit,d){ return realCols().map(c=>`<div class="cmp-now-item"><span class="cmp-dot" style="background:${c.color}"></span>${c.name}: <b style="color:${c.color}">${fmt(state[c.id][key],d)}${unit?' '+unit:''}</b></div>`).join(''); }
+
+function cmpAirNowHTML(){ return `<div class="cmp-now-item"><span class="cmp-dot" style="background:#6daa45"></span>CO₂: <b style="color:#6daa45">${fmt(state[3].eco2,0)} ppm</b></div><div class="cmp-now-item"><span class="cmp-dot" style="background:#e8af34"></span>TVOC: <b style="color:#e8af34">${fmt(state[3].tvoc,0)} ppb</b></div>`; }
+
+function minmax(hist){ if(!hist||!hist.length) return null; let mn=Infinity,mx=-Infinity; for(const p of hist){ const v=p.v; if(v==null||!Number.isFinite(v)) continue; if(v<mn)mn=v; if(v>mx)mx=v; } return mn===Infinity?null:{min:mn,max:mx}; }
+
+function cmpMMHTML(key,unit,d){ return realCols().map(c=>{ const mm=minmax(state[c.id].history[key]); const t=mm?`min ${fmt(mm.min,d)} · max ${fmt(mm.max,d)}${unit?' '+unit:''}`:'—'; return `<div class="cmp-mm-row"><span class="cmp-dot" style="background:${c.color}"></span><span class="cmp-mm-name">${c.name}</span><span class="cmp-mm-val">${t}</span></div>`; }).join(''); }
+
+function cmpMMAirHTML(){ const e=minmax(state[3].history['eco2']); const t=minmax(state[3].history['tvoc']); return `<div class="cmp-mm-row"><span class="cmp-dot" style="background:#6daa45"></span><span class="cmp-mm-name">CO₂</span><span class="cmp-mm-val">${e?`min ${fmt(e.min,0)} · max ${fmt(e.max,0)} ppm`:'—'}</span></div><div class="cmp-mm-row"><span class="cmp-dot" style="background:#e8af34"></span><span class="cmp-mm-name">TVOC</span><span class="cmp-mm-val">${t?`min ${fmt(t.min,0)} · max ${fmt(t.max,0)} ppb`:'—'}</span></div>`; }
+
+function mkMultiChart(id, series, unit){ const ctx=document.getElementById(id); if(!ctx) return; const grid=dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)'; const txt=dark?'#797876':'#7a7974'; const datasets=series.map(s=>({label:s.label,data:(s.hist||[]).map(p=>({x:p.t,y:p.v})),borderColor:s.color,backgroundColor:s.color+'22',fill:false,tension:0.4,borderWidth:2,pointRadius:0,pointHoverRadius:4})); cmpCharts[id]=new Chart(ctx,{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'nearest',intersect:false},plugins:{legend:{display:true,labels:{color:txt,boxWidth:10,usePointStyle:true,font:{size:11}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} ${unit}`}}},scales:{x:{type:'linear',ticks:{color:txt,maxTicksLimit:6,font:{size:10},callback:v=>new Date(v).toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit'})},grid:{color:grid}},y:{ticks:{color:txt,font:{size:10}},grid:{color:grid}}},animation:{duration:0}}}); }
+
+function buildComparison(){ const wrap=document.getElementById('cmp-charts'); if(!wrap) return; Object.values(cmpCharts).forEach(ch=>{try{ch.destroy()}catch(_){}}); cmpCharts={}; let html=''; for(const m of CMP_METRICS){ html+=`<div class="chart-card cmp-chart-card"><div class="chart-title">${m.label}${m.unit?` (${m.unit})`:''}</div><div class="cmp-now" id="cmpnow-${m.key}">${cmpNowHTML(m.key,m.unit,m.d)}</div><div class="chart-wrap cmp-wrap"><canvas id="cmp-${m.key}"></canvas></div><div class="cmp-mm" id="cmpmm-${m.key}">${cmpMMHTML(m.key,m.unit,m.d)}</div></div>`; } html+=`<div class="chart-card cmp-chart-card"><div class="chart-title">CO₂ & TVOC — Κολώνα 3</div><div class="cmp-now" id="cmpnow-air3">${cmpAirNowHTML()}</div><div class="chart-wrap cmp-wrap"><canvas id="cmp-air3"></canvas></div><div class="cmp-mm" id="cmpmm-air3">${cmpMMAirHTML()}</div></div>`; wrap.innerHTML=html; for(const m of CMP_METRICS){ mkMultiChart('cmp-'+m.key, realCols().map(c=>({label:c.name,color:c.color,hist:state[c.id].history[m.key]})), m.unit); } mkMultiChart('cmp-air3',[{label:'CO₂',color:'#6daa45',hist:state[3].history['eco2']},{label:'TVOC',color:'#e8af34',hist:state[3].history['tvoc']}],''); cmpBuilt=true; }
+
+function updateComparison(){ for(const m of CMP_METRICS){ const ch=cmpCharts['cmp-'+m.key]; if(ch){ realCols().forEach((c,i)=>{ if(ch.data.datasets[i]) ch.data.datasets[i].data=(state[c.id].history[m.key]||[]).map(p=>({x:p.t,y:p.v})); }); ch.update('none'); } const nn=document.getElementById('cmpnow-'+m.key); if(nn) nn.innerHTML=cmpNowHTML(m.key,m.unit,m.d); const mm=document.getElementById('cmpmm-'+m.key); if(mm) mm.innerHTML=cmpMMHTML(m.key,m.unit,m.d); } const air=cmpCharts['cmp-air3']; if(air){ air.data.datasets[0].data=(state[3].history['eco2']||[]).map(p=>({x:p.t,y:p.v})); if(air.data.datasets[1]) air.data.datasets[1].data=(state[3].history['tvoc']||[]).map(p=>({x:p.t,y:p.v})); air.update('none'); } const an=document.getElementById('cmpnow-air3'); if(an) an.innerHTML=cmpAirNowHTML(); const amm=document.getElementById('cmpmm-air3'); if(amm) amm.innerHTML=cmpMMAirHTML(); }
+
+function buildOverview(){ const onlineN=COLUMNS.filter(c=>{const s=state[c.id];return !!c.live&&(s.online||!stale(s.ts.temperature));}).length; const dirtyN=COLUMNS.filter(c=>pollutionIndex(c)>=65).length; const sub=document.getElementById('ov-sub'); if(sub) sub.textContent=`${COLUMNS.length} κολώνες · ${onlineN} online · ${dirtyN} σε υψηλή ρύπανση`; document.getElementById('ov-grid').innerHTML = COLUMNS.map(col=>{ const s = state[col.id]; const pv = pollutionIndex(col); return `<div class="ov-card" style="--ov-accent:${col.color}" onclick="openDashboard(${col.id})" role="button" tabindex="0"><div class="ov-header"><div class="ov-dot" style="background:${col.color}"></div><div><div class="ov-name">${col.name}${col.fake?' · demo':''}</div><div class="ov-street">${col.street}, Πάτρα</div></div></div><div class="ov-metrics"><div class="ov-m"><div class="ov-ml">Θερμοκρ.</div><div class="ov-mv" style="color:${col.color}">${fmt(s.temperature)} °C</div></div><div class="ov-m"><div class="ov-ml">Υγρασία</div><div class="ov-mv" style="color:${col.color}">${fmt(s.humidity,0)}%</div></div><div class="ov-m"><div class="ov-ml">CO₂</div><div class="ov-mv" style="color:${col.color}">${fmt(s.eco2,0)} ppm</div></div><div class="ov-m"><div class="ov-ml">LDR</div><div class="ov-mv" style="color:${col.color}">${fmt(s.ldr,0)}</div></div></div><div class="ov-poll" style="background:${pollutionColor(pv)}22;color:${pollutionColor(pv)}">◍ Ρύπανση: ${pollutionLabel(pv)} (${Math.round(pv)})</div>${hasParking(col)?parkOvBadge(col):''}<button class="btn-dashboard" style="margin-top:var(--space-4)">Dashboard →</button></div>`; }).join(''); document.getElementById('cmp-tbody').innerHTML = COLUMNS.map(col=>{ const s = state[col.id]; const online = !!col.live && (s.online || !stale(s.ts.temperature)); const pv = pollutionIndex(col); return `<tr><td><span class="col-badge" style="background:${col.color}22;color:${col.color}">${col.name}</span></td><td>${fmt(s.temperature)}</td><td>${fmt(s.humidity,0)}</td><td>${fmt(s.eco2,0)}</td><td>${fmt(s.ldr,0)}</td><td>${fmt(s.pressure)}</td><td><span class="trend" style="background:${pollutionColor(pv)}22;color:${pollutionColor(pv)}">${pollutionLabel(pv)}</span></td><td><span class="trend ${online?'up':'down'}">${online?'● Online':'◌ Offline'}</span></td></tr>`; }).join(''); }
+
+document.getElementById('theme-btn').addEventListener('click',()=>{ dark = !dark; document.documentElement.setAttribute('data-theme', dark?'dark':'light'); document.getElementById('theme-btn').textContent = dark?'☾':'☀'; applyMapTheme(); if(currentView==='dashboard') renderDashboard(currentDashCol); if(currentView==='comparison'){ cmpBuilt=false; buildComparison(); } });
+
+document.addEventListener('DOMContentLoaded', async ()=>{ const _r=parseHash(); if(_r.embed) document.body.classList.add('embed'); initState(); for(let i=0;i<20;i++) simulateFake(); initMap(); applyInitialRoute(); setStatus('connecting','Σύνδεση με Home Assistant…'); buildEntityIndex(); await refreshFromHA(); loadHistory(); wsConnect(); setTimeout(()=>myMap&&myMap.invalidateSize(),300); setInterval(liveTick, RENDER_MS); setInterval(refreshFromHA, POLL_MS); });
+
+document.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.classList.contains('ov-card')) e.target.click(); });
+
+</script>
+
+</body>
+
+</html>

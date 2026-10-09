@@ -1,0 +1,14 @@
+# Credentials — never commit / Κωδικοί — ποτέ στο git
+secrets.h
+
+# Arduino build output
+build/
+*.bin
+*.elf
+*.map
+
+# Editor / OS
+.vscode/
+.DS_Store
+*.bak
+__pycache__/

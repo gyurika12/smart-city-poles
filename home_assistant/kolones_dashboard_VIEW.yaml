@@ -1,0 +1,171 @@
+# =============================================================================
+#  ΓΙΑ ΤΟΝ RAW CONFIGURATION EDITOR ΤΟΥ DASHBOARD
+# -----------------------------------------------------------------------------
+#  !! ΜΗΝ αντικαταστήσεις ό,τι έχεις. ΠΡΟΣΘΕΣΕ.
+#
+#  Στο dashboard σου υπάρχει ήδη μια γραμμή «views:» με κάτι από κάτω.
+#  Αντίγραψε ΜΟΝΟ το κομμάτι από το «- title: Κολόνες» και κάτω, και κόλλησέ το
+#  στο ΤΕΛΟΣ της δικής σου λίστας views, με την ΙΔΙΑ στοίχιση όπως τα υπόλοιπα
+#  «- title:» που έχεις ήδη.
+#
+#  Π.χ. θα καταλήξει να μοιάζει έτσι:
+#
+#     views:
+#       - title: Σπίτι
+#         cards: [...]
+#       - title: Κολόνες          <-- το νέο
+#         path: kolones
+#         cards: [...]
+#
+#  ΠΙΟ ΕΥΚΟΛΟ: Edit > + ADD CARD > Manual > επικόλληση του
+#  kolones_dashboard_card.yaml. Δεν χρειάζεται καθόλου ο Raw editor.
+# =============================================================================
+
+views:
+- title: Κολόνες
+  path: kolones
+  icon: mdi:lightbulb-group
+  cards:
+  - type: vertical-stack
+    cards:
+    - type: entities
+      title: Πείραμα εξοικονόμησης
+      entities:
+      - entity: input_select.kolones_mode
+        name: Αποψινό σενάριο
+      - entity: input_boolean.kolones_test_enabled
+        name: Πείραμα ενεργό
+      - entity: sensor.kolones_saving_pct
+        name: ΕΞΟΙΚΟΝΟΜΗΣΗ
+      - type: divider
+      - entity: sensor.kolones_avg_w_baseline
+        name: Μέση ισχύς - 100% όλη νύχτα
+      - entity: sensor.kolones_avg_w_adaptive
+        name: Μέση ισχύς - προσαρμοστικό
+      - type: divider
+      - entity: sensor.kolones_energy_baseline
+        name: Σύνολο kWh baseline
+      - entity: sensor.kolones_energy_adaptive
+        name: Σύνολο kWh adaptive
+      - entity: sensor.kolones_hours_baseline
+        name: Ώρες baseline
+      - entity: sensor.kolones_hours_adaptive
+        name: Ώρες adaptive
+      - entity: counter.kolones_passes_night
+        name: Διελεύσεις απόψε
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: Κατανάλωση ανά νύχτα (kWh)
+        show_states: false
+      graph_span: 14d
+      span:
+        end: day
+      apex_config:
+        chart:
+          type: bar
+        plotOptions:
+          bar:
+            columnWidth: 70%
+      series:
+      - entity: sensor.kolones_energy_daily_baseline
+        name: 100% όλη τη νύχτα
+        type: column
+        color: '#5b8def'
+        group_by:
+          func: max
+          duration: 1d
+      - entity: sensor.kolones_energy_daily_adaptive
+        name: Προσαρμοστικό
+        type: column
+        color: '#3fbf7f'
+        group_by:
+          func: max
+          duration: 1d
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: Διελεύσεις ανά νύχτα (έλεγχος εγκυρότητας)
+      graph_span: 14d
+      span:
+        end: day
+      series:
+      - entity: input_number.kolones_passes_last_baseline
+        name: Baseline νύχτες
+        type: column
+        color: '#5b8def'
+        group_by:
+          func: last
+          duration: 1d
+      - entity: input_number.kolones_passes_last_adaptive
+        name: Adaptive νύχτες
+        type: column
+        color: '#3fbf7f'
+        group_by:
+          func: last
+          duration: 1d
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: Ισχύς Shelly vs φωτεινότητα λαμπών (24ωρο)
+      graph_span: 24h
+      yaxis:
+      - id: watt
+        min: 0
+        apex_config:
+          title:
+            text: W
+      - id: pwm
+        opposite: true
+        min: 0
+        max: 255
+        apex_config:
+          title:
+            text: PWM
+      series:
+      - entity: sensor.shellyem_xxxxxxxxxxxx_channel_1_power
+        name: Ισχύς λαμπών
+        yaxis_id: watt
+        type: area
+        color: '#e8a33d'
+        stroke_width: 2
+      - entity: sensor.kolones_avg_brightness
+        name: Μέση φωτεινότητα λαμπών
+        yaxis_id: pwm
+        type: line
+        curve: stepline
+        color: '#5b8def'
+        stroke_width: 2
+    - type: custom:apexcharts-card
+      header:
+        show: true
+        title: Προφίλ φωτισμού ανά λάμπα (24ωρο) — εδώ φαίνεται το κύμα
+      graph_span: 24h
+      yaxis:
+      - min: 0
+        max: 255
+      apex_config:
+        legend:
+          show: true
+      series:
+      - entity: light.yeelink_de_132850344_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 1
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: '#5b8def'
+      - entity: light.yeelink_de_132861009_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 2
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: '#3fbf7f'
+      - entity: light.yeelink_de_132926528_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 3
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: '#e8a33d'

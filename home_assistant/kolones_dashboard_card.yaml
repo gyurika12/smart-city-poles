@@ -1,0 +1,165 @@
+# =============================================================================
+#  ΚΑΡΤΕΣ DASHBOARD - ΤΟ ΔΙΑΓΡΑΜΜΑ ΤΗΣ ΑΝΑΦΟΡΑΣ
+#  Χρειάζεται το ApexCharts Card (HACS -> Frontend -> "ApexCharts Card")
+#  Settings > Dashboards > Edit > Add card > Manual > επικόλληση
+# =============================================================================
+type: vertical-stack
+cards:
+
+  # --- 1. ΤΟ ΒΑΣΙΚΟ ΝΟΥΜΕΡΟ ------------------------------------------------
+  - type: entities
+    title: Πείραμα εξοικονόμησης
+    entities:
+      - entity: input_select.kolones_mode
+        name: Αποψινό σενάριο
+      - entity: input_boolean.kolones_test_enabled
+        name: Πείραμα ενεργό
+      - entity: sensor.kolones_saving_pct
+        name: ΕΞΟΙΚΟΝΟΜΗΣΗ
+      - type: divider
+      - entity: sensor.kolones_avg_w_baseline
+        name: Μέση ισχύς - 100% όλη νύχτα
+      - entity: sensor.kolones_avg_w_adaptive
+        name: Μέση ισχύς - προσαρμοστικό
+      - type: divider
+      - entity: sensor.kolones_energy_baseline
+        name: Σύνολο kWh baseline
+      - entity: sensor.kolones_energy_adaptive
+        name: Σύνολο kWh adaptive
+      - entity: sensor.kolones_hours_baseline
+        name: Ώρες baseline
+      - entity: sensor.kolones_hours_adaptive
+        name: Ώρες adaptive
+      - entity: counter.kolones_passes_night
+        name: Διελεύσεις απόψε
+
+  # --- 2. ΤΟ ΔΙΑΓΡΑΜΜΑ ΤΗΣ ΑΝΑΦΟΡΑΣ: kWh ΑΝΑ ΝΥΧΤΑ -----------------------
+  #  Μπλε μπάρες (100% όλη νύχτα) ψηλές, πράσινες (προσαρμοστικό) χαμηλές.
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Κατανάλωση ανά νύχτα (kWh)
+      show_states: false
+    graph_span: 14d
+    span:
+      end: day
+    apex_config:
+      chart:
+        type: bar
+      plotOptions:
+        bar:
+          columnWidth: 70%
+    series:
+      - entity: sensor.kolones_energy_daily_baseline
+        name: 100% όλη τη νύχτα
+        type: column
+        color: "#5b8def"
+        group_by:
+          func: max
+          duration: 1d
+      - entity: sensor.kolones_energy_daily_adaptive
+        name: Προσαρμοστικό
+        type: column
+        color: "#3fbf7f"
+        group_by:
+          func: max
+          duration: 1d
+
+  # --- 3. ΕΛΕΓΧΟΣ ΕΓΚΥΡΟΤΗΤΑΣ: ίδια κίνηση στα δύο σενάρια; --------------
+  #  Χωρίς αυτό, κάποιος θα σου πει "μπορεί απλώς να μην πέρασε κανείς".
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Διελεύσεις ανά νύχτα (έλεγχος εγκυρότητας)
+    graph_span: 14d
+    span:
+      end: day
+    series:
+      - entity: input_number.kolones_passes_last_baseline
+        name: Baseline νύχτες
+        type: column
+        color: "#5b8def"
+        group_by:
+          func: last
+          duration: 1d
+      - entity: input_number.kolones_passes_last_adaptive
+        name: Adaptive νύχτες
+        type: column
+        color: "#3fbf7f"
+        group_by:
+          func: last
+          duration: 1d
+
+  # --- 4. Η ΑΠΟΔΕΙΞΗ: ισχύς Shelly vs απόφαση κολόνων --------------------
+  #  Οι δύο γραμμές πρέπει να κινούνται μαζί. Αυτό αποδεικνύει ότι η μείωση
+  #  ενέργειας ΟΦΕΙΛΕΤΑΙ στην απόφαση των κολόνων, όχι σε κάτι άλλο.
+  #  Είναι η πιο δυνατή εικόνα για την αναφορά.
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Ισχύς Shelly vs φωτεινότητα λαμπών (24ωρο)
+    graph_span: 24h
+    yaxis:
+      - id: watt
+        min: 0
+        apex_config:
+          title:
+            text: W
+      - id: pwm
+        opposite: true
+        min: 0
+        max: 255
+        apex_config:
+          title:
+            text: PWM
+    series:
+      - entity: sensor.shellyem_xxxxxxxxxxxx_channel_1_power   # Shelly EM καν.1
+        name: Ισχύς λαμπών
+        yaxis_id: watt
+        type: area
+        color: "#e8a33d"
+        stroke_width: 2
+      - entity: sensor.kolones_avg_brightness
+        name: Μέση φωτεινότητα λαμπών
+        yaxis_id: pwm
+        type: line
+        curve: stepline
+        color: "#5b8def"
+        stroke_width: 2
+
+  # --- 5. ΠΡΟΦΙΛ: τα σκαλοπάτια 50% -> 78% -> 100% ανά κολόνα -----------
+  - type: custom:apexcharts-card
+    header:
+      show: true
+      title: Προφίλ φωτισμού ανά λάμπα (24ωρο) — εδώ φαίνεται το κύμα
+    graph_span: 24h
+    yaxis:
+      - min: 0
+        max: 255
+    apex_config:
+      legend:
+        show: true
+    series:
+      # ΕΔΩ ΦΑΙΝΕΤΑΙ ΤΟ ΚΥΜΑ: όταν μια λάμπα πηδάει στο 255, οι γειτονικές
+      # ανεβαίνουν ταυτόχρονα στο 224 (προ-άναμμα), ενώ η μη γειτονική μένει 191.
+      - entity: light.yeelink_de_132850344_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 1
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: "#5b8def"
+      - entity: light.yeelink_de_132861009_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 2
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: "#3fbf7f"
+      - entity: light.yeelink_de_132926528_color3_s_2_light
+        attribute: brightness
+        name: Λάμπα 3
+        type: line
+        curve: stepline
+        stroke_width: 2
+        color: "#e8a33d"

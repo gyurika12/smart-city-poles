@@ -1,0 +1,291 @@
+# =============================================================================
+#  ΚΟΛΟΝΕΣ - ΠΛΗΡΗΣ ΕΛΕΓΧΟΣ + ΠΕΙΡΑΜΑ ΕΝΕΡΓΕΙΑΣ
+#  Αντικαθιστά τον υπάρχοντα αυτοματισμό σου.
+#  Settings > Automations > «Κολόνες - Πλήρης έλεγχος» > ⋮ > Edit in YAML
+#  > διάλεξε τα πάντα, σβήσε, επικόλλησε αυτό.
+# -----------------------------------------------------------------------------
+#  ΤΙ ΠΡΟΣΤΕΘΗΚΕ σε σχέση με τον δικό σου:
+#
+#   1. ΤΟ ΚΥΜΑ. Πριν, μόνο η λάμπα που ανίχνευσε πήγαινε 100%. Τώρα οι
+#      ΓΕΙΤΟΝΙΚΕΣ πάνε στο 88% - το φως προπορεύεται του διερχόμενου, όπως
+#      ακριβώς κάνει και το firmware των κολόνων.
+#
+#   2. ΔΥΟ ΣΕΝΑΡΙΑ εναλλάξ μέρα-παρά-μέρα, για τη μέτρηση εξοικονόμησης:
+#         baseline = 100% ΟΛΗ τη νύχτα (ο «παλιός» φωτισμός δρόμου)
+#         adaptive = 75% βάση, 88% από γείτονα, 100% στη διέλευση
+#      Στο baseline οι ανιχνεύσεις αγνοούνται - είναι το σημείο αναφοράς.
+#
+#   3. Μετρητής διελεύσεων, ώστε να αποδεικνύεις ότι η κίνηση ήταν παρόμοια
+#      και στις δύο νύχτες.
+#
+#  ΔΙΟΡΘΩΣΕΙΣ σε σχέση με τον δικό σου:
+#   - Έφυγε το «delay: 1 δευτ.» πριν το άναμμα. Καθυστερούσε την αντίδραση
+#     έναν ολόκληρο δευτερόλεπτο - ακριβώς τη στιγμή που μετράει.
+#   - max: 10 -> 25, γιατί με τρεις λάμπες ανά συμβάν η ουρά γέμιζε.
+#   - ΤΑ timer.kolona1/2/3 ΔΕΝ ΥΠΗΡΧΑΝ ΚΑΘΟΛΟΥ στο Home Assistant. Ο παλιός
+#     αυτοματισμός τα καλούσε, το HA δεν έβγαζε σφάλμα, και οι λάμπες δεν
+#     επέστρεφαν ΠΟΤΕ στη βάση μετά από ανίχνευση. Δημιουργήθηκαν (60 δευτ.).
+#
+#  ΣΕΝΑΡΙΟ: μονή μέρα του χρόνου -> baseline 100%, ζυγή -> adaptive 75%.
+# =============================================================================
+
+alias: Κολόνες - Πλήρης έλεγχος
+description: Ημέρα/νύχτα + κύμα + πείραμα εξοικονόμησης ενέργειας
+mode: queued
+max: 25
+
+# -----------------------------------------------------------------------------
+#  ΡΥΘΜΙΣΕ ΕΔΩ: στάθμες φωτεινότητας (0-255)
+# -----------------------------------------------------------------------------
+variables:
+  fos_vasi:     191   # 75%  - νύχτα, κανείς γύρω (σενάριο adaptive)
+  fos_kyma:     224   # 88%  - ανίχνευσε ΓΕΙΤΟΝΙΚΗ κολόνα (προ-άναμμα)
+  fos_boost:    255   # 100% - ανίχνευσε Η ΙΔΙΑ
+  fos_baseline: 255   # 100% - σενάριο baseline, όλη τη νύχτα
+  # ΣΗΜΕΙΩΣΗ: όσο πιο χαμηλά το fos_vasi, τόσο μεγαλύτερη η εξοικονόμηση.
+  # Με 191 (75%) το θεωρητικό μέγιστο είναι ~25%. Με 128 (50%) γίνεται ~50%.
+
+  oles:
+    - light.yeelink_de_132850344_color3_s_2_light
+    - light.yeelink_de_132861009_color3_s_2_light
+    - light.yeelink_de_132926528_color3_s_2_light
+
+  lampes:
+    laser1: light.yeelink_de_132850344_color3_s_2_light
+    laser2: light.yeelink_de_132861009_color3_s_2_light
+    laser3: light.yeelink_de_132926528_color3_s_2_light
+    timer1: light.yeelink_de_132850344_color3_s_2_light
+    timer2: light.yeelink_de_132861009_color3_s_2_light
+    timer3: light.yeelink_de_132926528_color3_s_2_light
+
+  # ΤΟ ΚΥΜΑ: ποιες λάμπες προ-ανάβουν όταν ανιχνεύσει η καθεμία.
+  # Μόνο ΓΕΙΤΟΝΙΚΕΣ κολόνες (1-2, 2-3). Η 1 και η 3 δεν είναι γειτονικές.
+  geitones:
+    laser1:
+      - light.yeelink_de_132861009_color3_s_2_light
+    laser2:
+      - light.yeelink_de_132850344_color3_s_2_light
+      - light.yeelink_de_132926528_color3_s_2_light
+    laser3:
+      - light.yeelink_de_132861009_color3_s_2_light
+
+  chronometra:
+    laser1: timer.kolona1
+    laser2: timer.kolona2
+    laser3: timer.kolona3
+
+  # Τα χρονόμετρα ΤΩΝ ΓΕΙΤΟΝΩΝ. Χωρίς αυτά, η γειτονική λάμπα που ανέβηκε
+  # στο 88% από το κύμα δεν κατέβαινε ΠΟΤΕ ξανά στη βάση.
+  chronometra_geitonon:
+    laser1:
+      - timer.kolona2
+    laser2:
+      - timer.kolona1
+      - timer.kolona3
+    laser3:
+      - timer.kolona2
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.kolona_1_kolona_1_photeinoteta_lux
+    above: 50
+    for: "00:00:10"
+    id: mera
+  - trigger: numeric_state
+    entity_id: sensor.kolona_1_kolona_1_photeinoteta_lux
+    below: 30
+    for: "00:00:10"
+    id: vradu
+  - trigger: homeassistant
+    event: start
+    id: restart
+  - trigger: state
+    entity_id: binary_sensor.kolona_1_col1_laser
+    to: "on"
+    id: laser1
+  - trigger: state
+    entity_id: binary_sensor.kolona_2_col2_laser
+    to: "on"
+    id: laser2
+  - trigger: state
+    entity_id: binary_sensor.kolona_3_col3_laser
+    to: "on"
+    id: laser3
+  - trigger: state
+    entity_id: timer.kolona1
+    from: active
+    to: idle
+    id: timer1
+  - trigger: state
+    entity_id: timer.kolona2
+    from: active
+    to: idle
+    id: timer2
+  - trigger: state
+    entity_id: timer.kolona3
+    from: active
+    to: idle
+    id: timer3
+
+conditions: []
+
+actions:
+  - choose:
+
+      # ================= ΜΕΡΑ: όλα σβηστά =================
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: mera
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: restart
+                  - condition: numeric_state
+                    entity_id: sensor.kolona_1_kolona_1_photeinoteta_lux
+                    above: 50
+        sequence:
+          # Κλείνοντας η νύχτα, φύλαξε πόσες διελεύσεις είχε - στο σωστό σενάριο.
+          # Χωρίς αυτό δεν υπάρχει ιστορικό για το διάγραμμα εγκυρότητας.
+          - if:
+              - condition: trigger
+                id: mera
+            then:
+              - action: input_number.set_value
+                target:
+                  entity_id: >
+                    {{ 'input_number.kolones_passes_last_baseline'
+                       if is_state('input_select.kolones_mode','baseline')
+                       else 'input_number.kolones_passes_last_adaptive' }}
+                data:
+                  value: "{{ states('counter.kolones_passes_night') | int(0) }}"
+          - action: light.turn_off
+            target:
+              entity_id: "{{ oles }}"
+            data:
+              transition: 10
+
+      # ============ ΝΥΧΤΑ: διάλεξε σενάριο και ξεκίνα ============
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: vradu
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: restart
+                  - condition: numeric_state
+                    entity_id: sensor.kolona_1_kolona_1_photeinoteta_lux
+                    below: 30
+        sequence:
+          # Ζυγή μέρα του χρόνου -> baseline, μονή -> adaptive.
+          # Ντετερμινιστικό: μπορείς να το εξηγήσεις στην αναφορά.
+          # Στο restart ΔΕΝ ξαναδιαλέγουμε, για να μη χαλάσει η νύχτα στη μέση.
+          - if:
+              - condition: trigger
+                id: vradu
+            then:
+              - variables:
+                  senario: >
+                    {{ 'adaptive' if (now().timetuple().tm_yday % 2 == 0)
+                       else 'baseline' }}
+              - action: input_select.select_option
+                target:
+                  entity_id: input_select.kolones_mode
+                data:
+                  option: "{{ senario }}"
+              # Γύρνα τους μετρητές ενέργειας στο σωστό «τιμολόγιο»
+              - action: select.select_option
+                target:
+                  entity_id:
+                    - select.kolones_energy
+                    - select.kolones_energy_daily
+                data:
+                  option: "{{ senario }}"
+              - action: counter.reset
+                target:
+                  entity_id: counter.kolones_passes_night
+              - action: logbook.log
+                data:
+                  name: Κολόνες
+                  message: "Νύχτα σε σενάριο {{ senario | upper }}"
+
+          - action: light.turn_on
+            target:
+              entity_id: "{{ oles }}"
+            data:
+              brightness: >
+                {{ fos_baseline if is_state('input_select.kolones_mode','baseline')
+                   else fos_vasi }}
+              transition: 3
+
+      # ====== ΑΝΙΧΝΕΥΣΗ: boost + ΚΥΜΑ στους γείτονες ======
+      # Τρέχει ΜΟΝΟ στο σενάριο adaptive. Στο baseline οι λάμπες είναι ήδη
+      # στο 100% όλη τη νύχτα, οπότε οι ανιχνεύσεις αγνοούνται.
+      - conditions:
+          - condition: trigger
+            id:
+              - laser1
+              - laser2
+              - laser3
+          - condition: state
+            entity_id: input_select.kolones_mode
+            state: adaptive
+          - condition: template
+            value_template: "{{ is_state(lampes[trigger.id], 'on') }}"
+        sequence:
+          # 1. Η κολόνα που ανίχνευσε -> 100%
+          - action: light.turn_on
+            target:
+              entity_id: "{{ lampes[trigger.id] }}"
+            data:
+              brightness: "{{ fos_boost }}"
+              transition: 1
+          # 2. ΤΟ ΚΥΜΑ: οι γειτονικές -> 88% (προ-άναμμα)
+          #    ΜΟΝΟ όσες είναι χαμηλότερα από το 88%, ώστε να μη "ρίξει"
+          #    λάμπα που είναι ήδη στο 100% επειδή κάποιος στέκεται μπροστά της.
+          - action: light.turn_on
+            target:
+              entity_id: >
+                {% set ns = namespace(l=[]) %}
+                {% for e in geitones[trigger.id] %}
+                  {% if (state_attr(e,'brightness') or 0) < fos_kyma %}
+                    {% set ns.l = ns.l + [e] %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.l }}
+            data:
+              brightness: "{{ fos_kyma }}"
+              transition: 1
+          # 3. Χρονόμετρο επιστροφής - ΚΑΙ για την κολόνα ΚΑΙ για τους γείτονες
+          - action: timer.start
+            target:
+              entity_id: "{{ [chronometra[trigger.id]] + chronometra_geitonon[trigger.id] }}"
+            data:
+              duration: "00:01:00"
+          # 4. Μέτρησε τη διέλευση (έλεγχος εγκυρότητας του πειράματος)
+          - action: counter.increment
+            target:
+              entity_id: counter.kolones_passes_night
+
+      # ============ ΤΕΛΟΣ ΧΡΟΝΟΜΕΤΡΟΥ: πίσω στη βάση ============
+      - conditions:
+          - condition: trigger
+            id:
+              - timer1
+              - timer2
+              - timer3
+          - condition: state
+            entity_id: input_select.kolones_mode
+            state: adaptive
+          - condition: template
+            value_template: "{{ is_state(lampes[trigger.id], 'on') }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: "{{ lampes[trigger.id] }}"
+            data:
+              brightness: "{{ fos_vasi }}"
+              transition: 5

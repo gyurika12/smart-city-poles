@@ -1,0 +1,167 @@
+# =============================================================================
+#  ΒΟΗΘΗΤΙΚΑ ΓΙΑ ΤΟ ΠΕΙΡΑΜΑ ΕΞΟΙΚΟΝΟΜΗΣΗΣ ΕΝΕΡΓΕΙΑΣ
+#  Συνοδεύει τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος».
+# -----------------------------------------------------------------------------
+#  ΤΙ ΚΑΝΕΙ: ένα Shelly μετράει και τις 3 Yeelight. Ο αυτοματισμός εναλλάσσει
+#  μέρα-παρά-μέρα δύο σενάρια. Αυτό εδώ χωρίζει την ενέργεια σε δύο ξεχωριστά
+#  αθροίσματα - ένα ανά σενάριο - ώστε να βγει η σύγκριση.
+#
+#  ΕΓΚΑΤΑΣΤΑΣΗ
+#   1) Στο configuration.yaml (αν δεν το έχεις ήδη):
+#          homeassistant:
+#            packages: !include_dir_named packages
+#   2) Αυτό το αρχείο -> config/packages/kolones_energy_test.yaml
+#   3) Άλλαξε την ημερομηνία έναρξης (2 σημεία «<-- ΡΥΘΜΙΣΕ»).
+#      Τα entities του Shelly είναι ήδη συμπληρωμένα (κανάλι 1).
+#   4) Restart HA
+#   5) Βάλε τον αυτοματισμό από το kolones_automation.yaml
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 1. ΔΙΑΚΟΠΤΕΣ ΚΑΙ ΜΕΤΡΗΤΕΣ
+# ---------------------------------------------------------------------------
+input_select:
+  kolones_mode:
+    name: Σενάριο κολόνων
+    icon: mdi:lightbulb-group
+    options:
+      - baseline
+      - adaptive
+
+counter:
+  # Μηδενίζεται κάθε βράδυ από τον αυτοματισμό
+  kolones_passes_night:
+    name: Διελεύσεις νύχτας
+    icon: mdi:walk
+    step: 1
+
+input_number:
+  # Το πρωί αποθηκεύεται εδώ ο αριθμός της νύχτας που πέρασε
+  kolones_passes_last_baseline:
+    name: Διελεύσεις τελευταίας baseline νύχτας
+    min: 0
+    max: 100000
+    step: 1
+    mode: box
+  kolones_passes_last_adaptive:
+    name: Διελεύσεις τελευταίας adaptive νύχτας
+    min: 0
+    max: 100000
+    step: 1
+    mode: box
+
+# ---------------------------------------------------------------------------
+# 2. ΕΝΕΡΓΕΙΑ ΜΕ ΔΥΟ «ΤΙΜΟΛΟΓΙΑ» - ΕΝΑ ΑΝΑ ΣΕΝΑΡΙΟ
+# ---------------------------------------------------------------------------
+#  ΤΟ ΔΙΚΟ ΣΟΥ: Shelly EM (μετρητής με αμπεροτσιμπίδα, 2 κανάλια).
+#
+#  !! ΑΝ ΟΙ ΛΑΜΠΕΣ ΕΙΝΑΙ ΣΤΟ ΚΑΝΑΛΙ 2 !!  άλλαξε το channel_1 -> channel_2
+#  και στα δύο σημεία πιο κάτω, ΚΑΙ στην κάρτα του dashboard.
+#  Πώς το βρίσκεις: άναψε τις 3 λάμπες στο 255 και δες ποιο από τα δύο
+#    sensor.shellyem_xxxxxxxxxxxx_channel_1_power
+#    sensor.shellyem_xxxxxxxxxxxx_channel_2_power
+#  ανεβαίνει.
+#
+#  Δημιουργούνται:
+#    sensor.kolones_energy_baseline / _adaptive              (σύνολα)
+#    sensor.kolones_energy_daily_baseline / _adaptive        (ανά νύχτα)
+#    select.kolones_energy / select.kolones_energy_daily     (τα γυρίζει ο αυτοματισμός)
+# ---------------------------------------------------------------------------
+utility_meter:
+  kolones_energy:
+    source: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy   # Shelly EM κανάλι 1
+    tariffs: [baseline, adaptive]
+
+  kolones_energy_daily:
+    source: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy   # το ίδιο
+    cycle: daily
+    tariffs: [baseline, adaptive]
+
+# ---------------------------------------------------------------------------
+# 3. ΩΡΕΣ ΑΝΑ ΣΕΝΑΡΙΟ
+# ---------------------------------------------------------------------------
+#  Οι νύχτες δεν έχουν ίδια διάρκεια. Με τις ώρες βγάζεις ΜΕΣΗ ΙΣΧΥ σε Watt -
+#  αυτό είναι το σωστό νούμερο για την αναφορά, όχι τα σκέτα kWh.
+# ---------------------------------------------------------------------------
+sensor:
+  - platform: history_stats
+    name: Kolones Hours Baseline
+    entity_id: input_select.kolones_mode
+    state: "baseline"
+    type: time
+    start: "{{ as_timestamp(strptime('2026-09-14', '%Y-%m-%d')) | timestamp_local }}"   # ημερομηνία έναρξης πειράματος (ΟΧΙ στο μέλλον!)
+    end: "{{ now() }}"
+
+  - platform: history_stats
+    name: Kolones Hours Adaptive
+    entity_id: input_select.kolones_mode
+    state: "adaptive"
+    type: time
+    start: "{{ as_timestamp(strptime('2026-09-14', '%Y-%m-%d')) | timestamp_local }}"   # ημερομηνία έναρξης πειράματος (ΟΧΙ στο μέλλον!)
+    end: "{{ now() }}"
+
+# ---------------------------------------------------------------------------
+# 4. ΥΠΟΛΟΓΙΣΜΟΙ
+# ---------------------------------------------------------------------------
+template:
+  - sensor:
+      - name: "Kolones Avg W Baseline"
+        unique_id: kolones_avg_w_baseline
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set e = states('sensor.kolones_energy_baseline') | float(0) %}
+          {% set h = states('sensor.kolones_hours_baseline') | float(0) %}
+          {{ (e / h * 1000) | round(1) if h > 0.1 else 0 }}
+
+      - name: "Kolones Avg W Adaptive"
+        unique_id: kolones_avg_w_adaptive
+        unit_of_measurement: "W"
+        device_class: power
+        state: >
+          {% set e = states('sensor.kolones_energy_adaptive') | float(0) %}
+          {% set h = states('sensor.kolones_hours_adaptive') | float(0) %}
+          {{ (e / h * 1000) | round(1) if h > 0.1 else 0 }}
+
+      # --- ΤΟ ΝΟΥΜΕΡΟ ΤΗΣ ΑΝΑΦΟΡΑΣ ---
+      - name: "Kolones Saving Pct"
+        unique_id: kolones_saving_pct
+        unit_of_measurement: "%"
+        icon: mdi:leaf
+        state: >
+          {% set b = states('sensor.kolones_avg_w_baseline') | float(0) %}
+          {% set a = states('sensor.kolones_avg_w_adaptive') | float(0) %}
+          {{ ((b - a) / b * 100) | round(1) if b > 0 else 0 }}
+        attributes:
+          baseline_w: "{{ states('sensor.kolones_avg_w_baseline') }}"
+          adaptive_w: "{{ states('sensor.kolones_avg_w_adaptive') }}"
+          hours_baseline: "{{ states('sensor.kolones_hours_baseline') }}"
+          hours_adaptive: "{{ states('sensor.kolones_hours_adaptive') }}"
+
+      # --- Μέση φωτεινότητα των 3 λαμπών: δείχνει ΓΙΑΤΙ υπάρχει διαφορά ---
+      - name: "Kolones Avg Brightness"
+        unique_id: kolones_avg_brightness
+        unit_of_measurement: "bri"
+        state: >
+          {% set l = ['light.yeelink_de_132850344_color3_s_2_light',
+                      'light.yeelink_de_132861009_color3_s_2_light',
+                      'light.yeelink_de_132926528_color3_s_2_light'] %}
+          {{ (l | map('state_attr','brightness')
+                | map('int', 0) | sum / 3) | round(0) }}
+
+# =============================================================================
+#  ΕΛΕΓΧΟΣ ΠΡΙΝ ΞΕΚΙΝΗΣΕΙΣ (5 λεπτά, γλιτώνει βδομάδες χαμένης μέτρησης)
+# -----------------------------------------------------------------------------
+#  Οι Yeelight ΠΡΕΠΕΙ να ντιμάρουν πραγματικά στο ρεύμα, όχι μόνο οπτικά.
+#  Developer Tools > Actions > light.turn_on σε μία λάμπα:
+#     brightness: 255  -> σημείωσε τα Watt στο Shelly
+#     brightness: 128  -> τα Watt ΠΡΕΠΕΙ να πέσουν αισθητά
+#  Αν δεν αλλάξουν, το πείραμα θα βγάλει 0% εξοικονόμηση.
+#
+#  ΜΕΤΡΗΣΕ ΚΑΙ ΤΟ STANDBY: οι Yeelight τραβάνε ~0,5-1 W η καθεμία ΣΒΗΣΤΕΣ
+#  (WiFi + controller). Με 3 λάμπες ~2-3 W που δεν γλιτώνονται ποτέ - είναι το
+#  «πάτωμα» της μέτρησής σου. Σβήσ' τες όλες, δες τα Watt, σημείωσέ τα.
+#
+#  ΓΙΑ XIAOMI/YEELIGHT: στο Mi Home ενεργοποίησε «LAN Control» σε κάθε λάμπα.
+#  Χωρίς αυτό οι εντολές πάνε από το cloud (1-3s καθυστέρηση + rate limiting).
+# =============================================================================

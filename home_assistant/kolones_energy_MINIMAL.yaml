@@ -1,0 +1,42 @@
+# =============================================================================
+#  ΕΛΑΧΙΣΤΗ ΕΚΔΟΣΗ - για να βρούμε τι φταίει
+#  Χωρίς history_stats και χωρίς template sensors (τα πιο συχνά ύποπτα).
+#  Αν ΑΥΤΟ περάσει το Check Configuration, το πρόβλημα είναι σε εκείνα.
+#  Δίνει ήδη τα σημαντικά: τα δύο αθροίσματα kWh ανά σενάριο.
+# =============================================================================
+input_select:
+  kolones_mode:
+    name: Σενάριο κολόνων
+    icon: mdi:lightbulb-group
+    options:
+      - baseline
+      - adaptive
+
+counter:
+  kolones_passes_night:
+    name: Διελεύσεις νύχτας
+    icon: mdi:walk
+    step: 1
+
+input_number:
+  kolones_passes_last_baseline:
+    name: Διελεύσεις τελευταίας baseline νύχτας
+    min: 0
+    max: 100000
+    step: 1
+    mode: box
+  kolones_passes_last_adaptive:
+    name: Διελεύσεις τελευταίας adaptive νύχτας
+    min: 0
+    max: 100000
+    step: 1
+    mode: box
+
+utility_meter:
+  kolones_energy:
+    source: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy
+    tariffs: [baseline, adaptive]
+  kolones_energy_daily:
+    source: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy
+    cycle: daily
+    tariffs: [baseline, adaptive]
