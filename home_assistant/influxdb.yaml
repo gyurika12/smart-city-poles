@@ -22,3 +22,14 @@ influxdb:
   password: !secret influxdb_password
   max_retries: 3
   default_measurement: state
+
+# -----------------------------------------------------------------------------
+#  NOTE / ΣΗΜΕΙΩΣΗ — COL1 pressure
+#  COL1 publishes pressure in Pa (BME688). The MQTT sensor in configuration.yaml
+#  converts it to hPa / Η COL1 στέλνει την πίεση σε Pa· το MQTT sensor τη μετατρέπει:
+#
+#    - { name: "Col1 Pressure", unique_id: col1_pressure,
+#        state_topic: "esp32s3/col1/sensors/pressure",
+#        value_template: "{{ (value | float(0) / 100) | round(1) }}",
+#        unit_of_measurement: "hPa", device_class: pressure, state_class: measurement }
+# -----------------------------------------------------------------------------

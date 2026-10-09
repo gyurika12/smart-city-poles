@@ -283,7 +283,7 @@ void publishSensors() {
   if (!net.mqttOk()) return;
   pub.f(P_TEMP,   topicTemp,      bmeTemp,   1, 0.1f);
   pub.f(P_HUM,    topicHum,       bmeHum,    1, 0.3f);
-  pub.f(P_PRESS,  topicPress,     bmePres,   0, 10.0f);
+  pub.f(P_PRESS,  topicPress,     bmePres,   0, 10.0f);   // σε Pa! Το Home Assistant το διαιρεί με 100 (value_template) -> hPa
   pub.f(P_GASBME, topicGasBME,    bmeGasVal, 0, 500.0f);
   pub.f(P_LUX,    topicLux,       disp_lux,  1, 1.0f);
   pub.f(P_UV,     topicUV,        disp_uv,   2, 0.02f);
