@@ -26,6 +26,7 @@
 #include <SPI.h>
 #include <LoRa.h>
 #include <Adafruit_VL53L0X.h>
+#include <Adafruit_LTR390.h>     // απλό module LTR390 (0x53) - εναλλακτικό του DFRobot
 #include <KolonaCore.h>
 #include <KolonaDisplay.h>
 
@@ -168,6 +169,8 @@ enum PubId {
 Kolona::Publisher<P_COUNT> pub(net.mqtt());
 
 bool bh1750Found = false, ltr390Found = false, bme688Found = false;
+Adafruit_LTR390 ltrAda;              // χρησιμοποιείται αν δεν βρεθεί το DFRobot (0x1C)
+bool ltrIsAda = false;
 bool tofFound = false, loraFound = false;
 
 // --- BME688 χωρίς delay ---
@@ -383,7 +386,19 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL);
   Wire.setTimeOut(50);              // δεν κολλάει για πάντα αν γλιστρήσει ο bus
 
+  // ---- Σάρωση I2C: τυπώνει ποιες συσκευές απαντούν (για διάγνωση) ----
+  // Αναμενόμενες: 0x23/0x5C BH1750, 0x1C LTR390 DFRobot, 0x53 LTR390 απλό,
+  //               0x29 VL53L0X, 0x76/0x77 BME688
+  Serial.print("[I2C] συσκευές:");
+  for (uint8_t a = 1; a < 127; a++) {
+    Wire.beginTransmission(a);
+    if (Wire.endTransmission() == 0) Serial.printf(" 0x%02X", a);
+  }
+  Serial.println();
+
   bh1750Found = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+  if (!bh1750Found)                  // ADDR pin σε HIGH -> διεύθυνση 0x5C
+    bh1750Found = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x5C, &Wire);
   Serial.println(bh1750Found ? "BH1750 OK" : "BH1750 FAIL");
 
   if (ltr390.begin() == 0) {
@@ -392,6 +407,12 @@ void setup() {
     ltr390.setALSOrUVSGain(ltr390.eGain3);
     ltr390.setMode(ltr390.eUVSMode);
     Serial.println("LTR390 OK");
+  } else if (ltrAda.begin(&Wire)) {  // απλό module LTR390 στο 0x53
+    ltr390Found = true; ltrIsAda = true;
+    ltrAda.setMode(LTR390_MODE_UVS);
+    ltrAda.setGain(LTR390_GAIN_3);
+    ltrAda.setResolution(LTR390_RESOLUTION_18BIT);
+    Serial.println("LTR390 OK (0x53)");
   } else Serial.println("LTR390 FAIL");
 
   if (bme.begin() == 0) {
@@ -491,7 +512,8 @@ void loop() {
     // 2300 counts/UVI για gain 18x και 20 bit. Εδώ: gain 3x, 18 bit (setup)
     // -> 2300 * (3/18) * (2^18/2^20) = ~95.8 counts/UVI.
     // (Ο παλιός κώδικας διαιρούσε με 2300 -> ~24x μικρότερη τιμή, πάντα 0.00.)
-    if (ltr390Found) disp_uv = ltr390.readOriginalData() / UV_COUNTS_PER_UVI;
+    if (ltr390Found && !ltrIsAda) disp_uv = ltr390.readOriginalData() / UV_COUNTS_PER_UVI;
+    if (ltr390Found && ltrIsAda && ltrAda.newDataAvailable()) disp_uv = ltrAda.readUVS() / UV_COUNTS_PER_UVI;
 
     disp_us    = readDistance();
     disp_pir   = digitalRead(PIR_PIN);
