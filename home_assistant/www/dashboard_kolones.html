@@ -516,7 +516,28 @@ const HA_URL  = (location.protocol === 'http:' || location.protocol === 'https:'
 
   : "http://your-ha-ip:8123";
 
-const HA_TOKEN = "YOUR_LONG_LIVED_TOKEN_HERE";
+// TOKEN: δεν αποθηκεύεται πλέον στο αρχείο (τα αρχεία του /local/ τα βλέπει
+// οποιοσδήποτε χωρίς σύνδεση). Η σελίδα χρησιμοποιεί το token της ΤΡΕΧΟΥΣΑΣ
+// σύνδεσής σου στο Home Assistant (ίδιο origin):
+//   1) αν είναι μέσα σε dashboard (iframe) -> από το Home Assistant που την περιέχει
+//   2) αλλιώς -> από το localStorage "hassTokens" (χρειάζεται «Keep me logged in»)
+//      και ανανεώνεται αυτόματα πριν λήξει.
+function haToken(){
+  try{ const h = window.parent !== window && window.parent.document.querySelector('home-assistant');
+       const t = h && h.hass && h.hass.auth && h.hass.auth.data && h.hass.auth.data.access_token;
+       if(t) return t; }catch(_){}
+  try{ return (JSON.parse(localStorage.getItem('hassTokens') || '{}').access_token) || ''; }catch(_){ return ''; }
+}
+async function haRefreshToken(){
+  try{ const t = JSON.parse(localStorage.getItem('hassTokens') || 'null');
+       if(!t || !t.refresh_token || (t.expires && t.expires - Date.now() > 5*60*1000)) return;
+       const r = await fetch(HA_URL + '/auth/token', { method:'POST', body: new URLSearchParams({
+         grant_type:'refresh_token', client_id:t.clientId, refresh_token:t.refresh_token }) });
+       if(!r.ok) return; const j = await r.json();
+       t.access_token = j.access_token; t.expires = Date.now() + j.expires_in*1000;
+       localStorage.setItem('hassTokens', JSON.stringify(t)); }catch(_){}
+}
+haRefreshToken(); setInterval(haRefreshToken, 60000);
 
 const POLL_MS = 10000;
 
@@ -629,7 +650,7 @@ function closeDiag(){ const o=document.getElementById('diag-overlay'); if(o) o.s
 
 function initState(){ COLUMNS.forEach(c => state[c.id] = { temperature:null, humidity:null, pressure:null, gas:null, gas_bme:null, eco2:null, tvoc:null, tof:null, ultrasonic:null, ldr:null, ldr2:null, lux:null, uv:null, motion:null, rain:null, water_level:null, flame:null, audio:null, light_level:null, lora_payload:null, air_quality:null, led_state:'—', led_state_text:'—', led_mode:'—', led_switch:false, online:false, ts:{}, history:Object.fromEntries(HIST_KEYS.map(k=>[k,[]])) }); }
 
-function haHeaders(){ return { Authorization:`Bearer ${HA_TOKEN}` }; }
+function haHeaders(){ return { Authorization:`Bearer ${haToken()}` }; }
 
 async function haGet(path){ const r = await fetch(HA_URL + path, { headers: haHeaders() }); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
 
@@ -697,7 +718,7 @@ function wsConnect(){ if(!USE_WEBSOCKET) return; let ws; try{ ws=new WebSocket(H
 
   ws.onmessage=(evt)=>{ let m; try{ m=JSON.parse(evt.data); }catch(_){ return; }
 
-    if(m.type==='auth_required'){ ws.send(JSON.stringify({type:'auth',access_token:HA_TOKEN})); return; }
+    if(m.type==='auth_required'){ ws.send(JSON.stringify({type:'auth',access_token:haToken()})); return; }
 
     if(m.type==='auth_invalid'){ setStatus('error','WebSocket: μη έγκυρο token'); return; }
 

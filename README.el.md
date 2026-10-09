@@ -41,6 +41,7 @@ flowchart LR
     end
     Pole <-- "MQTT<br/>esp32s3/colN/…" --> B[(Mosquitto<br/>broker)]
     B <--> HA[Home Assistant]
+    HA --> I[(InfluxDB)] --> G[Grafana]
     Pole <-- "esp32s3/wave/event" --> N[Γειτονικές κολόνες]
     HA --> Y[3× έξυπνες λάμπες]
     Y --> M[Μετρητής ισχύος<br/>Shelly EM]
@@ -71,6 +72,14 @@ flowchart LR
 - **Slideshow χωρίς διαρροές μνήμης** — σταθεροί πίνακες `char` αντί για `String` και buffer εικόνας που δεσμεύεται μία φορά στο boot — αυτό έλυσε τα κρασαρίσματα από κατακερματισμό μνήμης μετά από ώρες λειτουργίας.
 - **Κοινή βιβλιοθήκη (DRY)** — η λογική που είναι κοινή και στις τρεις κολόνες υπάρχει μία φορά στη [`KolonaCore`](libraries/KolonaCore/src)· κάθε sketch κρατά μόνο τα pins, τα topics και τους αισθητήρες του (≈50 % μικρότερα sketches).
 - **Επιλογή οθόνης κατά τη μεταγλώττιση** — οι δύο οθόνες θέλουν διαφορετικό setup του TFT_eSPI· μια μεταβλητή στο `build_opt.h` επιλέγει αυτόματα το σωστό, και έλεγχος κατά τη μεταγλώττιση σταματά το build με σαφές μήνυμα αν χρησιμοποιηθεί λάθος setup.
+
+## Grafana & InfluxDB
+
+Όλες οι μετρήσεις αποθηκεύονται μακροχρόνια στο **InfluxDB** μέσω της ενσωμάτωσης `influxdb` του Home Assistant και απεικονίζονται στο **Grafana** (και τα δύο τρέχουν ως add-ons του Home Assistant). Το dashboard συγκρίνει τις τρεις κολόνες και έχει μία ενότητα για κάθε κολόνα.
+
+![Dashboard του Grafana](docs/images/grafana.jpg)
+
+Στον φάκελο [`grafana/`](grafana) είναι το dashboard για import και στο [`home_assistant/influxdb.yaml`](home_assistant/influxdb.yaml) η ρύθμιση της ενσωμάτωσης.
 
 ## Πείραμα εξοικονόμησης ενέργειας
 
@@ -111,7 +120,8 @@ libraries/
 home_assistant/    Αυτοματισμός, πακέτο πειράματος ενέργειας, κάρτες dashboard (YAML)
   www/             Δικό μου dashboard σε HTML/JS (ζωντανός χάρτης, σύγκριση, ιστορικό — Leaflet + Chart.js)
 docs/              Κείμενα διπλωματικής (PDF) και φωτογραφίες
-tools/             Script που παράγει το PDF σύγκρισης με τη βιβλιογραφία
+grafana/           Dashboard του Grafana (JSON) + script που το παράγει
+tools/             Script για το PDF σύγκρισης και για αφαίρεση του token από τη σελίδα HTML
 ```
 
 ## Εγκατάσταση
@@ -128,7 +138,7 @@ tools/             Script που παράγει το PDF σύγκρισης με
    arduino-cli compile -b esp32:esp32:esp32s3 firmware/col1
    ```
 7. **Home Assistant:** οδηγίες στα σχόλια στην αρχή κάθε αρχείου του [`home_assistant/`](home_assistant) — το πακέτο ενέργειας μπαίνει στο `config/packages/`, ο αυτοματισμός και οι κάρτες επικολλώνται από το UI (το διάγραμμα θέλει το *ApexCharts Card* από το HACS).
-8. **Dashboard HTML (προαιρετικό):** αντέγραψε το `home_assistant/www/dashboard_kolones.html` στο `config/www/`, φτιάξε ένα long-lived access token (Προφίλ → Security) και βάλ' το στη θέση του `YOUR_LONG_LIVED_TOKEN_HERE`. Ανοίγει στο `http://<ha>:8123/local/dashboard_kolones.html` ή μέσα σε dashboard με κάρτα *iframe*. ⚠️ Τα αρχεία του `www/` σερβίρονται χωρίς σύνδεση — μην εκθέτεις στο internet το αντίγραφο με το πραγματικό token.
+8. **Dashboard HTML (προαιρετικό):** αντέγραψε το `home_assistant/www/dashboard_kolones.html` στο `config/www/`, και άνοιξέ το στο `http://<ha>:8123/local/dashboard_kolones.html` ή μέσα σε dashboard με κάρτα *iframe*. Δεν αποθηκεύεται κανένα token στο αρχείο: η σελίδα χρησιμοποιεί τη σύνδεσή σου στο Home Assistant (ίδιο origin) και την ανανεώνει αυτόματα.
 
 > **Σημείωση:** στα αρχεία YAML του Home Assistant, αντικατέστησε το `shellyem_xxxxxxxxxxxx` με το entity ID του δικού σου Shelly EM.
 

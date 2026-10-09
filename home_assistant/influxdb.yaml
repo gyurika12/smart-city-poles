@@ -1,0 +1,24 @@
+# =============================================================================
+#  InfluxDB — long-term storage of all sensor values (for Grafana)
+#  Μακροχρόνια αποθήκευση όλων των μετρήσεων (για το Grafana)
+# -----------------------------------------------------------------------------
+#  EN: Add this block to configuration.yaml and put the password in
+#      secrets.yaml as  influxdb_password: "...".  Requires the
+#      "InfluxDB" add-on (v1) with a database named  kolones.
+#  ΕΛ: Πρόσθεσε το block στο configuration.yaml και βάλε τον κωδικό στο
+#      secrets.yaml ως  influxdb_password: "...". Χρειάζεται το add-on
+#      "InfluxDB" (v1) με βάση δεδομένων  kolones.
+#
+#  Data layout used by the Grafana dashboard / Δομή που περιμένει το Grafana:
+#    measurement = unit of measurement (°C, %, hPa, ppm, ppb, Ω) or "state"
+#    tag entity_id = entity without domain, e.g. col1_temperature
+# =============================================================================
+influxdb:
+  api_version: 1
+  host: a0d7b954-influxdb        # hostname of the InfluxDB add-on
+  port: 8086
+  database: kolones
+  username: homeassistant
+  password: !secret influxdb_password
+  max_retries: 3
+  default_measurement: state

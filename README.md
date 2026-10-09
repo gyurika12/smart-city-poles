@@ -41,6 +41,7 @@ flowchart LR
     end
     Pole <-- "MQTT<br/>esp32s3/colN/…" --> B[(Mosquitto<br/>broker)]
     B <--> HA[Home Assistant]
+    HA --> I[(InfluxDB)] --> G[Grafana]
     Pole <-- "esp32s3/wave/event" --> N[Neighbouring poles]
     HA --> Y[3× smart bulbs]
     Y --> M[Shelly EM<br/>power meter]
@@ -71,6 +72,14 @@ Brightness ramps smoothly (20 ms steps); day/night switching uses a two-threshol
 - **Memory-safe slideshow** — fixed `char` buffers instead of `String`, and the JPEG buffer allocated once at boot — this fixed crashes caused by heap fragmentation after hours of operation.
 - **Shared library (DRY)** — the logic common to all poles lives once in [`KolonaCore`](libraries/KolonaCore/src); each sketch keeps only its pins, topics and sensors (≈50 % smaller sketches).
 - **Compile-time display selection** — the two displays need different TFT_eSPI setups; a `build_opt.h` flag selects the right one automatically, and a compile-time check stops the build with a clear message if the wrong setup is used.
+
+## Grafana & InfluxDB
+
+All sensor values are stored long-term in **InfluxDB** by the Home Assistant `influxdb` integration and visualised in **Grafana** (both run as Home Assistant add-ons). The dashboard compares the three poles side by side and has one row per pole.
+
+![Grafana dashboard](docs/images/grafana.jpg)
+
+See [`grafana/`](grafana) for the importable dashboard and [`home_assistant/influxdb.yaml`](home_assistant/influxdb.yaml) for the integration config.
 
 ## Energy-saving experiment
 
@@ -111,7 +120,8 @@ libraries/
 home_assistant/    Automation, energy-experiment package and dashboard cards (YAML)
   www/             Custom HTML/JS dashboard (live map, comparison, history — Leaflet + Chart.js)
 docs/              Thesis documents (Greek, PDF) and photos
-tools/             Script that generates the literature-comparison PDF
+grafana/           Grafana dashboard (JSON) + generator script
+tools/             PDF generator, token-removal patch for the HTML dashboard
 ```
 
 ## Getting started
@@ -128,7 +138,7 @@ tools/             Script that generates the literature-comparison PDF
    arduino-cli compile -b esp32:esp32:esp32s3 firmware/col1
    ```
 7. **Home Assistant:** see the comments at the top of each file in [`home_assistant/`](home_assistant) — the energy package goes in `config/packages/`, the automation and dashboard cards are pasted via the UI (the chart needs *ApexCharts Card* from HACS).
-8. **Custom HTML dashboard (optional):** copy `home_assistant/www/dashboard_kolones.html` to `config/www/`, create a long-lived access token (Profile → Security) and paste it in place of `YOUR_LONG_LIVED_TOKEN_HERE`. Open it at `http://<ha>:8123/local/dashboard_kolones.html` or embed it in a dashboard with an *iframe* card. ⚠️ Files in `www/` are served without login — keep that copy with the real token off the public internet.
+8. **Custom HTML dashboard (optional):** copy `home_assistant/www/dashboard_kolones.html` to `config/www/`, and open it at `http://<ha>:8123/local/dashboard_kolones.html` or embed it in a dashboard with an *iframe* card. No token is stored in the file: the page uses your current Home Assistant login (same origin) and refreshes it automatically.
 
 > **Note:** in the Home Assistant YAML files, replace `shellyem_xxxxxxxxxxxx` with the entity ID of your own Shelly EM.
 
