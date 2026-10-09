@@ -310,6 +310,7 @@
             "showPoints": "never",
             "spanNulls": true
           },
+          "decimals": 1,
           "unit": "pressurehpa"
         },
         "overrides": [
@@ -391,7 +392,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col1_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col1_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -402,7 +403,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col2_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col2_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "B",
           "resultFormat": "time_series"
@@ -413,7 +414,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col3_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col3_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series"
@@ -959,6 +960,7 @@
             "showPoints": "never",
             "spanNulls": true
           },
+          "decimals": 1,
           "unit": "pressurehpa"
         },
         "overrides": [
@@ -1010,7 +1012,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col1_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col1_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -1372,6 +1374,7 @@
             "showPoints": "never",
             "spanNulls": true
           },
+          "decimals": 1,
           "unit": "pressurehpa"
         },
         "overrides": [
@@ -1423,7 +1426,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col2_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col2_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"
@@ -1945,6 +1948,7 @@
             "showPoints": "never",
             "spanNulls": true
           },
+          "decimals": 1,
           "unit": "pressurehpa"
         },
         "overrides": [
@@ -1996,7 +2000,7 @@
             "type": "influxdb",
             "uid": "${DS_INFLUXDB}"
           },
-          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col3_pressure$/) AND $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT mean(\"value\") FROM \"hPa\" WHERE (\"entity_id\" =~ /^col3_pressure$/) AND \"value\" > 900 AND \"value\" < 1100 AND $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series"

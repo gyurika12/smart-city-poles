@@ -40,10 +40,18 @@ POLE_PANELS = {1: ["temp", "hum", "press", "gas", "ldr"],
                3: ["temp", "hum", "press", "eco2", "tvoc", "gas", "ldr"]}
 
 
+# Pressure: keep only physically valid values (900-1100 hPa). This drops the old
+# COL1 values stored in Pa (~101700, before 09/10/2026) and zero glitches after
+# reboots, so the axis auto-scales tightly and small pressure changes are visible.
+# Πίεση: μόνο έγκυρες τιμές 900-1100 hPa -> ο άξονας «σφίγγει» και φαίνονται οι μεταβολές.
+PRESS_FILTER = 'AND "value" > 900 AND "value" < 1100 '
+
+
 def target(pole, ref, measurement, regex):
+    extra = PRESS_FILTER if measurement == "hPa" else ""
     return {"alias": f"Κολώνα {pole}", "datasource": DS,
             "query": f'SELECT mean("value") FROM "{measurement}" WHERE ("entity_id" =~ {regex}) '
-                     f'AND $timeFilter GROUP BY time($__interval) fill(previous)',
+                     f'{extra}AND $timeFilter GROUP BY time($__interval) fill(previous)',
             "rawQuery": True, "refId": ref, "resultFormat": "time_series"}
 
 
@@ -57,7 +65,7 @@ def timeseries(pid, x, y, title, unit, series):
                 "custom": {"drawStyle": "line", "fillOpacity": 16, "gradientMode": "opacity",
                            "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5,
                            "showPoints": "never", "spanNulls": True},
-                "unit": unit},
+                **({"decimals": 1} if unit == "pressurehpa" else {}), "unit": unit},
             "overrides": [{"matcher": {"id": "byName", "options": f"Κολώνα {p}"},
                            "properties": [{"id": "color", "value": {"fixedColor": COLOR[p], "mode": "fixed"}}]}
                           for p, _, _ in series]},

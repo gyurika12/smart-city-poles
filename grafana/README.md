@@ -5,6 +5,11 @@
 
 ![Grafana](../docs/images/grafana.jpg)
 
+**Pressure / Πίεση** — only valid values (900–1100 hPa) are queried, so the axis auto-scales and small changes are visible.
+Μόνο έγκυρες τιμές (900–1100 hPa), ώστε ο άξονας να «σφίγγει» και να φαίνονται οι μικρές μεταβολές.
+
+![Pressure](../docs/images/grafana-pressure.jpg)
+
 | File | |
 |---|---|
 | `dashboards/kolones-patras.json` | Ready to import / Έτοιμο για import — 29 panels: comparison of all poles + one row per pole |
