@@ -148,6 +148,7 @@ const char* HA_IMG_DIR = "/local/images/";
 SPIClass           loraSPI(FSPI);     // ξεχωριστός SPI για LoRa (οθόνη = HSPI)
 BH1750             lightMeter;
 DFRobot_LTR390UV   ltr390(LTR390UV_DEVICE_ADDR, &Wire);
+const float UV_COUNTS_PER_UVI = 2300.0f * (3.0f / 18.0f) * (262144.0f / 1048576.0f);  // ~95.8
 DFRobot_BME68x_I2C bme(0x77);
 Adafruit_VL53L0X   lox;
 TFT_eSPI           tft = TFT_eSPI();
@@ -175,7 +176,7 @@ unsigned long lastBmeConvert = 0;
 bool bmeConverting = false;
 
 // --- τελευταίες τιμές ---
-float disp_lux = -1, disp_uv = 0, disp_us = -1;
+float disp_lux = -1, disp_uv = -1, disp_us = -1;   // -1 = ο αισθητήρας δεν βρέθηκε
 int   disp_tof = -1;
 bool  disp_laserTrig = false, disp_pir = false;
 int   rainVal = 1, airQualVal = 0, gasVal = 0, ldrVal = 0;
@@ -486,7 +487,11 @@ void loop() {
       float lux = lightMeter.readLightLevel();
       if (lux >= 0) disp_lux = lux;          // κρατάμε την τελευταία έγκυρη
     }
-    if (ltr390Found) disp_uv = ltr390.readOriginalData() / 2300.0f;
+    // Δείκτης UV (UVI) = counts / ευαισθησία. Το datasheet του LTR390 δίνει
+    // 2300 counts/UVI για gain 18x και 20 bit. Εδώ: gain 3x, 18 bit (setup)
+    // -> 2300 * (3/18) * (2^18/2^20) = ~95.8 counts/UVI.
+    // (Ο παλιός κώδικας διαιρούσε με 2300 -> ~24x μικρότερη τιμή, πάντα 0.00.)
+    if (ltr390Found) disp_uv = ltr390.readOriginalData() / UV_COUNTS_PER_UVI;
 
     disp_us    = readDistance();
     disp_pir   = digitalRead(PIR_PIN);
