@@ -230,3 +230,13 @@ rootfs/etc/s6-overlay/s6-rc.d/
 - [bashio](https://github.com/hassio-addons/bashio)
 - [s6-overlay v3](https://github.com/just-containers/s6-overlay)
 
+
+---
+
+## 8. Επεκτάσεις στην v1.1.0
+
+- **API proxy μέσω ingress:** ο nginx τώρα προωθεί τα `/api/*` στον HA core και βάζει αυτός το Supervisor token (το `ingress.conf` παράγεται στην εκκίνηση με sed από το `ingress.conf.tpl`). Το dashboard ανιχνεύει ότι τρέχει σε ingress (`/api/hassio_ingress/...` στο path) και στέλνει εκεί τα calls — τέλος η εξάρτηση από «Keep me logged in». Σε ingress mode το WebSocket κλείνει (`USE_WEBSOCKET = !INGRESS`) και μένει το polling 10s.
+- **Watchdog:** τρίτο s6 service (longrun) που κάνει poll τα `select.colX_led_mode` και στέλνει persistent notification σε πτώση/ανάκαμψη κολώνας. Αν είναι off, κάνει `exec tail -f /dev/null` (το busybox δεν έχει σίγουρα `sleep infinity`).
+- **InfluxDB package:** προαιρετικό, με `!secret influxdb_password` - φορτώνει μόνο με πλήρες restart.
+- **Grafana provisioning:** το dashboard JSON είχε `${DS_INFLUXDB}` από export-for-sharing - το sed το αντικαθιστά με το uid του provisioned datasource. Το `__inputs` metadata μένει αλλά είναι αδρανές εκτός import UI. Το Grafana add-on κάνει map το `/share` και δέχεται `GF_PATHS_PROVISIONING` μέσω env_vars.
+- **write_if_changed:** τα packages ξαναγράφονται (και γίνεται reload) μόνο όταν αλλάξει το περιεχόμενο - τέλος οι επαναλαμβανόμενες ειδοποιήσεις σε κάθε restart του add-on.

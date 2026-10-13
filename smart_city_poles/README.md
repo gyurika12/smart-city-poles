@@ -13,6 +13,8 @@ energy-saving experiment.
 1. **Dashboard (ingress):** serves the custom poles dashboard
    (`home_assistant/www/dashboard_kolones.html`) at the "Smart Poles" sidebar
    panel — live map, per-pole metrics, 24 h history charts, LED controls.
+   The HA API is proxied through the add-on with the Supervisor token, so
+   **no user token / "Keep me logged in" is required** any more.
 2. **Energy package:** writes helpers (`input_select.kolones_mode`,
    `counter.kolones_passes_night`, `input_number.*`, `timer.kolona1-3`),
    `utility_meter` tariffs (baseline/adaptive), `history_stats` hours and
@@ -20,7 +22,13 @@ energy-saving experiment.
    `/config/packages/smart_city_poles_energy.yaml`.
 3. **Automation:** writes the "Κολόνες - Πλήρης έλεγχος" automation to
    `/config/packages/smart_city_poles_automation.yaml`.
-4. Makes sure `configuration.yaml` loads the `packages` directory
+4. **Pole watchdog:** monitors the poles and notifies you when one goes
+   offline and when it recovers.
+5. **Optional InfluxDB config** (`install_influxdb`): long-term storage for
+   Grafana, as a package.
+6. **Optional Grafana provisioning** (`install_grafana`): ready datasource +
+   the 29-panel poles dashboard in `/share/grafana-provisioning/`.
+7. Makes sure `configuration.yaml` loads the `packages` directory
    (backs it up first), validates the configuration and reloads — or tells you
    in the notifications if a full restart is needed.
 

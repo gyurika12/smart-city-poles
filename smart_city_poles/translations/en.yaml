@@ -41,3 +41,30 @@ configuration:
     description: >-
       Start date (YYYY-MM-DD) for the per-scenario hours measurement.
       Must not be in the future.
+  install_influxdb:
+    name: Install InfluxDB config
+    description: >-
+      Writes the influxdb integration block (v1 API, database kolones) as a
+      package. Requires the InfluxDB add-on and influxdb_password in
+      secrets.yaml. A full restart is required.
+  install_grafana:
+    name: Prepare Grafana provisioning
+    description: >-
+      Writes a ready datasource (InfluxDB-Kolones) and the 29-panel poles
+      dashboard to /share/grafana-provisioning. Then point the Grafana add-on
+      there with the env var GF_PATHS_PROVISIONING=/share/grafana-provisioning
+      (see the notification after install).
+  influx_reader_user:
+    name: InfluxDB reader user
+    description: InfluxDB user that Grafana will use to read the kolones database.
+  influx_reader_password:
+    name: InfluxDB reader password
+    description: Password of the InfluxDB reader user (used by the Grafana datasource).
+  watchdog:
+    name: Pole watchdog
+    description: >-
+      Monitors the three poles and sends a notification when one goes offline
+      (unavailable) and when it recovers.
+  watchdog_poll_seconds:
+    name: Watchdog poll interval (seconds)
+    description: How often the watchdog checks the poles (15-3600 s).

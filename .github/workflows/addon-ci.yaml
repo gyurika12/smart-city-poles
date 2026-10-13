@@ -86,7 +86,45 @@ jobs:
           test -s smart_city_poles/rootfs/www/index.html
           grep -q "location.origin" smart_city_poles/rootfs/www/index.html
           grep -q "/api/websocket" smart_city_poles/rootfs/www/index.html
+          grep -q "hassio_ingress" smart_city_poles/rootfs/www/index.html
+          grep -q "const USE_WEBSOCKET = !INGRESS" smart_city_poles/rootfs/www/index.html
           echo "dashboard OK"
+
+      - name: Validate InfluxDB and Grafana templates
+        run: |
+          python3 - <<'EOF'
+          import json, yaml
+
+          class L(yaml.SafeLoader):
+              pass
+          L.add_multi_constructor('!', lambda l, s, n: None)
+
+          influx = yaml.load(open("smart_city_poles/rootfs/usr/src/kolones_influxdb.yaml.tpl"), Loader=L)
+          assert influx["influxdb"]["database"] == "kolones"
+          print("influxdb package OK")
+
+          ds = open("smart_city_poles/rootfs/usr/src/grafana/datasource.yaml.tpl").read()
+          ds = ds.replace("__INFLUX_USER__", "grafana").replace("__INFLUX_PASS__", "secret")
+          ds = yaml.safe_load(ds)
+          assert ds["datasources"][0]["uid"] == "influxdb-kolones"
+          print("grafana datasource OK")
+
+          prov = yaml.safe_load(open("smart_city_poles/rootfs/usr/src/grafana/dashboards_provider.yaml"))
+          assert prov["providers"][0]["options"]["path"] == "/share/grafana-provisioning/dashboards"
+          print("grafana provider OK")
+
+          raw = open("smart_city_poles/rootfs/usr/src/grafana/kolones-patras.json").read()
+          rendered_text = raw.replace("${DS_INFLUXDB}", "influxdb-kolones")
+          assert "${DS_INFLUXDB}" not in rendered_text, "unresolved datasource placeholder"
+          rendered = json.loads(rendered_text)
+          print("grafana dashboard OK:", rendered["title"], "| panels:", len(rendered["panels"]))
+          EOF
+
+      - name: Nginx template has token placeholder
+        run: |
+          grep -q "__SUPERVISOR_TOKEN__" smart_city_poles/rootfs/etc/nginx/http.d/ingress.conf.tpl
+          grep -q "proxy_pass http://supervisor/core" smart_city_poles/rootfs/etc/nginx/http.d/ingress.conf.tpl
+          echo "nginx template OK"
 
   build:
     name: Build add-on image (amd64)

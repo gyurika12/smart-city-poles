@@ -1,5 +1,9 @@
 #!/usr/bin/with-contenv bashio
 
+bashio::log.info "Rendering nginx config (Supervisor token injection)..."
+sed "s|__SUPERVISOR_TOKEN__|${SUPERVISOR_TOKEN}|g" \
+    /etc/nginx/http.d/ingress.conf.tpl > /etc/nginx/http.d/ingress.conf
+
 bashio::log.info "Starting Smart City Poles dashboard on port 8099 (ingress)..."
 
 exec nginx -g 'daemon off; error_log /dev/stdout info;'

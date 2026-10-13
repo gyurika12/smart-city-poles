@@ -510,11 +510,9 @@ a{color:inherit;text-decoration:none}
 
 // Αν την ανοίξεις σαν τοπικό αρχείο (file://), πέφτει πίσω στη σταθερή IP.
 
-const HA_URL  = (location.protocol === 'http:' || location.protocol === 'https:')
-
-  ? location.origin
-
-  : "http://your-ha-ip:8123";
+const INGRESS = (location.pathname.match(/^\/api\/hassio_ingress\/[^\/]+/) || [null])[0];
+const HA_URL  = INGRESS ? location.origin + INGRESS
+  : ((location.protocol === 'http:' || location.protocol === 'https:') ? location.origin : "http://your-ha-ip:8123");
 
 // TOKEN: δεν αποθηκεύεται πλέον στο αρχείο (τα αρχεία του /local/ τα βλέπει
 // οποιοσδήποτε χωρίς σύνδεση). Η σελίδα χρησιμοποιεί το token της ΤΡΕΧΟΥΣΑΣ
@@ -541,7 +539,7 @@ haRefreshToken(); setInterval(haRefreshToken, 60000);
 
 const POLL_MS = 10000;
 
-const USE_WEBSOCKET = true;   // true = ζωντανό push από HA (γρήγορο). false = μόνο poll
+const USE_WEBSOCKET = !INGRESS;   // via ingress nginx proxies only REST (ws needs a user token)   // true = ζωντανό push από HA (γρήγορο). false = μόνο poll
 
 const RENDER_MS = 1000;       // πόσο συχνά ανανεώνεται η εικόνα (1000 ms = 1 φορά/δευτ.)
 

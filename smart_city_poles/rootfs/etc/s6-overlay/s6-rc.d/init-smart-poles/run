@@ -12,8 +12,12 @@ PKG_DIR="${CONFIG_DIR}/packages"
 CONF_YAML="${CONFIG_DIR}/configuration.yaml"
 ENERGY_TPL="/usr/src/kolones_energy.yaml.tpl"
 AUTOMATION_TPL="/usr/src/kolones_automation.yaml.tpl"
+INFLUXDB_TPL="/usr/src/kolones_influxdb.yaml.tpl"
+GRAFANA_SRC="/usr/src/grafana"
 ENERGY_PKG="${PKG_DIR}/smart_city_poles_energy.yaml"
 AUTOMATION_PKG="${PKG_DIR}/smart_city_poles_automation.yaml"
+INFLUXDB_PKG="${PKG_DIR}/smart_city_poles_influxdb.yaml"
+GPROV="/share/grafana-provisioning"
 
 HA_API="http://supervisor/core/api"
 
@@ -43,6 +47,16 @@ render() {
         "$1" > "$2"
 }
 
+write_if_changed() {
+    # $1 = rendered source, $2 = destination. Returns 0 when it wrote (changed).
+    if [ -f "$2" ] && cmp -s "$1" "$2"; then
+        rm -f "$1"
+        return 1
+    fi
+    mv "$1" "$2"
+    return 0
+}
+
 # -----------------------------------------------------------------------------
 # Read options
 # -----------------------------------------------------------------------------
@@ -57,6 +71,10 @@ PRESENCE3=$(bashio::config 'presence_pole_3')
 LUX_SENSOR=$(bashio::config 'lux_sensor')
 SHELLY_ENERGY=$(bashio::config 'shelly_energy_entity')
 START_DATE=$(bashio::config 'experiment_start_date')
+INSTALL_INFLUXDB=$(bashio::config 'install_influxdb')
+INSTALL_GRAFANA=$(bashio::config 'install_grafana')
+INFLUX_USER=$(bashio::config 'influx_reader_user')
+INFLUX_PASS=$(bashio::config 'influx_reader_password')
 
 NEEDS_RESTART=0
 CHANGED=0
@@ -68,9 +86,13 @@ mkdir -p "${PKG_DIR}"
 # 1. Energy package (helpers + meters + sensors)
 # -----------------------------------------------------------------------------
 if bashio::var.true "${INSTALL_ENERGY}"; then
-    bashio::log.info "Writing energy package to ${ENERGY_PKG}"
-    render "${ENERGY_TPL}" "${ENERGY_PKG}"
-    CHANGED=1
+    render "${ENERGY_TPL}" "${ENERGY_PKG}.tmp"
+    if write_if_changed "${ENERGY_PKG}.tmp" "${ENERGY_PKG}"; then
+        bashio::log.info "Energy package written to ${ENERGY_PKG}"
+        CHANGED=1
+    else
+        bashio::log.info "Energy package unchanged."
+    fi
 else
     if [ -f "${ENERGY_PKG}" ]; then
         bashio::log.warning "install_energy_package is off - removing ${ENERGY_PKG}"
@@ -87,15 +109,71 @@ if bashio::var.true "${INSTALL_AUTOMATION}"; then
     if bashio::var.false "${INSTALL_ENERGY}"; then
         bashio::log.warning "The automation needs the helpers (input_select.kolones_mode, counter, timers). Make sure they exist - e.g. from a manual install of the energy package."
     fi
-    bashio::log.info "Writing control automation to ${AUTOMATION_PKG}"
-    render "${AUTOMATION_TPL}" "${AUTOMATION_PKG}"
-    CHANGED=1
+    render "${AUTOMATION_TPL}" "${AUTOMATION_PKG}.tmp"
+    if write_if_changed "${AUTOMATION_PKG}.tmp" "${AUTOMATION_PKG}"; then
+        bashio::log.info "Control automation written to ${AUTOMATION_PKG}"
+        CHANGED=1
+    else
+        bashio::log.info "Control automation unchanged."
+    fi
 else
     if [ -f "${AUTOMATION_PKG}" ]; then
         bashio::log.warning "install_automation is off - removing ${AUTOMATION_PKG}"
         rm -f "${AUTOMATION_PKG}"
         CHANGED=1
         NEEDS_RESTART=1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# 2b. InfluxDB package (long-term storage for Grafana) - needs a full restart
+# -----------------------------------------------------------------------------
+if bashio::var.true "${INSTALL_INFLUXDB}"; then
+    cp "${INFLUXDB_TPL}" "${INFLUXDB_PKG}.tmp"
+    if write_if_changed "${INFLUXDB_PKG}.tmp" "${INFLUXDB_PKG}"; then
+        bashio::log.info "InfluxDB package written to ${INFLUXDB_PKG}"
+        bashio::log.warning "InfluxDB loads at boot only - a full Home Assistant restart is required. Also make sure secrets.yaml contains influxdb_password."
+        CHANGED=1
+        NEEDS_RESTART=1
+    else
+        bashio::log.info "InfluxDB package unchanged."
+    fi
+else
+    if [ -f "${INFLUXDB_PKG}" ]; then
+        bashio::log.warning "install_influxdb is off - removing ${INFLUXDB_PKG}"
+        rm -f "${INFLUXDB_PKG}"
+        CHANGED=1
+        NEEDS_RESTART=1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# 2c. Grafana provisioning kit (datasource + 29-panel dashboard) in /share
+# -----------------------------------------------------------------------------
+if bashio::var.true "${INSTALL_GRAFANA}"; then
+    mkdir -p "${GPROV}/datasources" "${GPROV}/dashboards"
+    GRAFANA_CHANGED=0
+
+    sed -e "s#__INFLUX_USER__#${INFLUX_USER}#g" -e "s#__INFLUX_PASS__#${INFLUX_PASS}#g" \
+        "${GRAFANA_SRC}/datasource.yaml.tpl" > "${GPROV}/datasources/kolones.yaml.tmp"
+    write_if_changed "${GPROV}/datasources/kolones.yaml.tmp" "${GPROV}/datasources/kolones.yaml" && GRAFANA_CHANGED=1
+
+    cp "${GRAFANA_SRC}/dashboards_provider.yaml" "${GPROV}/dashboards/_provider.yaml.tmp"
+    write_if_changed "${GPROV}/dashboards/_provider.yaml.tmp" "${GPROV}/dashboards/_provider.yaml" && GRAFANA_CHANGED=1
+
+    sed 's|${DS_INFLUXDB}|influxdb-kolones|g' "${GRAFANA_SRC}/kolones-patras.json" > "${GPROV}/dashboards/kolones-patras.json.tmp"
+    write_if_changed "${GPROV}/dashboards/kolones-patras.json.tmp" "${GPROV}/dashboards/kolones-patras.json" && GRAFANA_CHANGED=1
+
+    if [ "${GRAFANA_CHANGED}" -eq 1 ]; then
+        bashio::log.info "Grafana provisioning files written to ${GPROV}"
+        ha_notify "Grafana: τα αρχεία provisioning γράφτηκαν στο /share/grafana-provisioning. Στο add-on Grafana πρόσθεσε στο configuration: env_vars -> name GF_PATHS_PROVISIONING, value /share/grafana-provisioning και κάνε restart το Grafana. Θα βρεις το dashboard «Εξυπνες Κολωνες - Πατρα» στον φάκελο Smart City Poles."
+    else
+        bashio::log.info "Grafana provisioning files unchanged."
+    fi
+else
+    if [ -d "${GPROV}" ]; then
+        bashio::log.warning "install_grafana is off - removing ${GPROV} (restart the Grafana add-on to unload the dashboard)"
+        rm -rf "${GPROV}"
     fi
 fi
 

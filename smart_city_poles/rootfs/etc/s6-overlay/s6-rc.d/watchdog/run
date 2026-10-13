@@ -1,0 +1,52 @@
+#!/usr/bin/with-contenv bashio
+# =============================================================================
+#  Smart City Poles - watchdog
+#  Polls one "alive" entity per pole and sends a persistent notification when
+#  a pole goes unavailable/unknown - and when it comes back.
+# =============================================================================
+
+if bashio::var.false "$(bashio::config 'watchdog')"; then
+    bashio::log.info "Watchdog disabled in the add-on options - idling."
+    exec tail -f /dev/null
+fi
+
+POLL=$(bashio::config 'watchdog_poll_seconds')
+HA_API="http://supervisor/core/api"
+
+ENTITIES=("select.col1_led_mode" "select.col2_led_mode" "select.col3_led_mode")
+NAMES=("Κολώνα 1" "Κολώνα 2" "Κολώνα 3")
+
+notify() {
+    # $1 = notification id suffix, $2 = message (no double quotes)
+    curl -sS -X POST \
+        -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "{\"title\": \"Smart City Poles\", \"notification_id\": \"smart_city_poles_watchdog_$1\", \"message\": \"$2\"}" \
+        "${HA_API}/services/persistent_notification/create" > /dev/null || true
+}
+
+bashio::log.info "Watchdog started (poll every ${POLL}s)."
+
+declare -A OFFLINE
+
+while true; do
+    for i in 0 1 2; do
+        STATE=$(curl -s -m 10 -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+            "${HA_API}/states/${ENTITIES[$i]}" | jq -r '.state // "unavailable"')
+
+        if [ "${STATE}" = "unavailable" ] || [ "${STATE}" = "unknown" ]; then
+            if [ -z "${OFFLINE[$i]}" ]; then
+                OFFLINE[$i]=1
+                bashio::log.warning "${NAMES[$i]} is OFFLINE (${ENTITIES[$i]} = ${STATE})"
+                notify "col$((i+1))" "❌ Η ${NAMES[$i]} είναι εκτός σύνδεσης (${ENTITIES[$i]}: ${STATE}). Έλεγξε τροφοδοσία / WiFi / MQTT."
+            fi
+        else
+            if [ -n "${OFFLINE[$i]}" ]; then
+                unset "OFFLINE[$i]"
+                bashio::log.info "${NAMES[$i]} is back online (${STATE})"
+                notify "col$((i+1))" "✅ Η ${NAMES[$i]} ξανασυνδέθηκε (κατάσταση: ${STATE})."
+            fi
+        fi
+    done
+    sleep "${POLL}"
+done

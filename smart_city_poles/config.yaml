@@ -1,5 +1,5 @@
 name: Smart City Poles
-version: "1.0.0"
+version: "1.1.0"
 slug: smart_city_poles
 description: >-
   Adaptive street-light poles: live dashboard (map + charts) in the sidebar and
@@ -18,6 +18,7 @@ homeassistant_api: true
 role: homeassistant
 map:
   - config:rw
+  - share:rw
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:lightbulb-group
@@ -34,6 +35,12 @@ options:
   lux_sensor: sensor.kolona_1_kolona_1_photeinoteta_lux
   shelly_energy_entity: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy
   experiment_start_date: "2026-09-14"
+  install_influxdb: false
+  install_grafana: false
+  influx_reader_user: grafana
+  influx_reader_password: ""
+  watchdog: true
+  watchdog_poll_seconds: 60
 schema:
   install_automation: bool
   install_energy_package: bool
@@ -46,3 +53,9 @@ schema:
   lux_sensor: str
   shelly_energy_entity: str
   experiment_start_date: match(^\d{4}-\d{2}-\d{2}$)
+  install_influxdb: bool
+  install_grafana: bool
+  influx_reader_user: str
+  influx_reader_password: password
+  watchdog: bool
+  watchdog_poll_seconds: int(15,3600)

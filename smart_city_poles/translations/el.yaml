@@ -41,3 +41,30 @@ configuration:
     description: >-
       Ημερομηνία έναρξης (ΕΕΕΕ-ΜΜ-ΗΗ) για τη μέτρηση ωρών ανά σενάριο.
       Όχι στο μέλλον!
+  install_influxdb:
+    name: Εγκατάσταση InfluxDB config
+    description: >-
+      Γράφει το block του influxdb integration (API v1, βάση kolones) ως
+      package. Απαιτεί το add-on InfluxDB και το influxdb_password στο
+      secrets.yaml. Χρειάζεται πλήρης επανεκκίνηση.
+  install_grafana:
+    name: Προετοιμασία Grafana provisioning
+    description: >-
+      Γράφει έτοιμο datasource (InfluxDB-Kolones) και το dashboard των
+      κολώνων (29 panels) στο /share/grafana-provisioning. Μετά δείξε το
+      Grafana add-on εκεί με env var GF_PATHS_PROVISIONING=/share/grafana-provisioning
+      (δες την ειδοποίηση μετά την εγκατάσταση).
+  influx_reader_user:
+    name: Χρήστης ανάγνωσης InfluxDB
+    description: Ο χρήστης InfluxDB που θα διαβάζει τη βάση kolones για το Grafana.
+  influx_reader_password:
+    name: Κωδικός χρήστη ανάγνωσης InfluxDB
+    description: Ο κωδικός του χρήστη ανάγνωσης (για το datasource του Grafana).
+  watchdog:
+    name: Watchdog κολώνων
+    description: >-
+      Παρακολουθεί τις τρεις κολόνες και στέλνει ειδοποίηση όταν κάποια πέσει
+      εκτός σύνδεσης (unavailable) και όταν επανέλθει.
+  watchdog_poll_seconds:
+    name: Περίοδος ελέγχου watchdog (δευτ.)
+    description: Κάθε πόσα δευτερόλεπτα ελέγχει τις κολόνες (15-3600).

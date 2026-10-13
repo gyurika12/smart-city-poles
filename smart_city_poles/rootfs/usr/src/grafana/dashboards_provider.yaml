@@ -1,0 +1,14 @@
+# Dashboards provider: loads every *.json in the dashboards folder.
+apiVersion: 1
+
+providers:
+  - name: smart-city-poles
+    orgId: 1
+    folder: Smart City Poles
+    folderUid: smart-city-poles
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /share/grafana-provisioning/dashboards
+      foldersFromFilesStructure: false
