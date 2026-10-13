@@ -1,0 +1,43 @@
+configuration:
+  install_automation:
+    name: Εγκατάσταση αυτοματισμού
+    description: >-
+      Εγκαθιστά τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος» (μέρα/νύχτα, κύμα
+      προ-φωτισμού, σενάρια baseline/adaptive) ως package στο /config/packages/.
+      Χρειάζεται τα helpers του energy package.
+  install_energy_package:
+    name: Εγκατάσταση energy package
+    description: >-
+      Εγκαθιστά helpers, utility_meter τιμολόγια, history_stats και template
+      sensors για το πείραμα εξοικονόμησης ενέργειας στο /config/packages/.
+  light_pole_1:
+    name: Λάμπα κολώνας 1
+    description: Το light entity που ελέγχει τη λάμπα της κολώνας 1 (π.χ. Yeelight).
+  light_pole_2:
+    name: Λάμπα κολώνας 2
+    description: Το light entity που ελέγχει τη λάμπα της κολώνας 2.
+  light_pole_3:
+    name: Λάμπα κολώνας 3
+    description: Το light entity που ελέγχει τη λάμπα της κολώνας 3.
+  presence_pole_1:
+    name: Αισθητήρας παρουσίας κολώνας 1
+    description: Binary sensor που ανάβει όταν η κολώνα 1 ανιχνεύει διέλευση.
+  presence_pole_2:
+    name: Αισθητήρας παρουσίας κολώνας 2
+    description: Binary sensor που ανάβει όταν η κολώνα 2 ανιχνεύει διέλευση.
+  presence_pole_3:
+    name: Αισθητήρας παρουσίας κολώνας 3
+    description: Binary sensor που ανάβει όταν η κολώνα 3 ανιχνεύει διέλευση.
+  lux_sensor:
+    name: Αισθητήρας lux (μέρα/νύχτα)
+    description: Αισθητήρας φωτεινότητας που αποφασίζει μέρα/νύχτα στον αυτοματισμό.
+  shelly_energy_entity:
+    name: Αισθητήρας ενέργειας Shelly
+    description: >-
+      Το entity ενέργειας (kWh) του καναλιού του Shelly EM που τροφοδοτεί τις
+      τρεις λάμπες, π.χ. sensor.shellyem_xxxxxxxxxxxx_channel_1_energy.
+  experiment_start_date:
+    name: Ημερομηνία έναρξης πειράματος
+    description: >-
+      Ημερομηνία έναρξης (ΕΕΕΕ-ΜΜ-ΗΗ) για τη μέτρηση ωρών ανά σενάριο.
+      Όχι στο μέλλον!

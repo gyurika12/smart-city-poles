@@ -142,6 +142,20 @@ tools/             PDF generator, token-removal patch for the HTML dashboard
 
 > **Note:** in the Home Assistant YAML files, replace `shellyem_xxxxxxxxxxxx` with the entity ID of your own Shelly EM.
 
+## Home Assistant add-on
+
+This repository is also a **Home Assistant add-on repository**. The
+**Smart City Poles** add-on gives you:
+
+- the live dashboard (map + charts) in the Home Assistant **sidebar** via ingress — no copy-paste to `config/www/`;
+- **automatic installation** of the control automation and the energy-experiment package into `config/packages/`, with all entity IDs (lights, Shelly EM, lux/presence sensors) configurable from the add-on options.
+
+**Install:** Settings → Add-ons → Add-on Store → ⋮ → Repositories → add
+`https://github.com/gyurika12/smart-city-poles` → install **Smart City Poles** →
+set your entity IDs in the Configuration tab → Start. See
+[`smart_city_poles/README.md`](smart_city_poles/README.md) and
+[how the add-on was built](smart_city_poles/HOW_IT_WAS_BUILT.md) (Greek).
+
 ## Documentation
 
 - [Software technical documentation (Greek)](docs/code-documentation_el.pdf) — code-to-chapter map, sensors, MQTT protocol, energy experiment, full topic list.

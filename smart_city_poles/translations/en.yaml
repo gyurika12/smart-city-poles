@@ -1,0 +1,43 @@
+configuration:
+  install_automation:
+    name: Install control automation
+    description: >-
+      Installs the "Poles - Full control" automation (day/night, pre-light wave,
+      baseline/adaptive scenarios) as a package in /config/packages/.
+      Requires the helpers from the energy package.
+  install_energy_package:
+    name: Install energy package
+    description: >-
+      Installs helpers, utility_meter tariffs, history_stats and template
+      sensors for the energy-saving experiment into /config/packages/.
+  light_pole_1:
+    name: Pole 1 light entity
+    description: Light entity that controls the lamp of pole 1 (e.g. Yeelight).
+  light_pole_2:
+    name: Pole 2 light entity
+    description: Light entity that controls the lamp of pole 2.
+  light_pole_3:
+    name: Pole 3 light entity
+    description: Light entity that controls the lamp of pole 3.
+  presence_pole_1:
+    name: Pole 1 presence sensor
+    description: Binary sensor that turns on when pole 1 detects a passer-by.
+  presence_pole_2:
+    name: Pole 2 presence sensor
+    description: Binary sensor that turns on when pole 2 detects a passer-by.
+  presence_pole_3:
+    name: Pole 3 presence sensor
+    description: Binary sensor that turns on when pole 3 detects a passer-by.
+  lux_sensor:
+    name: Lux sensor (day/night)
+    description: Illuminance sensor used by the automation to decide day/night.
+  shelly_energy_entity:
+    name: Shelly energy sensor
+    description: >-
+      Energy (kWh) entity of the Shelly EM channel that feeds the three lamps,
+      e.g. sensor.shellyem_xxxxxxxxxxxx_channel_1_energy.
+  experiment_start_date:
+    name: Experiment start date
+    description: >-
+      Start date (YYYY-MM-DD) for the per-scenario hours measurement.
+      Must not be in the future.

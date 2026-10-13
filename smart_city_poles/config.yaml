@@ -1,0 +1,48 @@
+name: Smart City Poles
+version: "1.0.0"
+slug: smart_city_poles
+description: >-
+  Adaptive street-light poles: live dashboard (map + charts) in the sidebar and
+  automatic installation of the control automation and the energy-saving
+  experiment package.
+url: https://github.com/gyurika12/smart-city-poles
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+init: false
+startup: application
+homeassistant_api: true
+role: homeassistant
+map:
+  - config:rw
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:lightbulb-group
+panel_title: Smart Poles
+options:
+  install_automation: true
+  install_energy_package: true
+  light_pole_1: light.yeelink_de_132850344_color3_s_2_light
+  light_pole_2: light.yeelink_de_132861009_color3_s_2_light
+  light_pole_3: light.yeelink_de_132926528_color3_s_2_light
+  presence_pole_1: binary_sensor.kolona_1_col1_laser
+  presence_pole_2: binary_sensor.kolona_2_col2_laser
+  presence_pole_3: binary_sensor.kolona_3_col3_laser
+  lux_sensor: sensor.kolona_1_kolona_1_photeinoteta_lux
+  shelly_energy_entity: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy
+  experiment_start_date: "2026-09-14"
+schema:
+  install_automation: bool
+  install_energy_package: bool
+  light_pole_1: str
+  light_pole_2: str
+  light_pole_3: str
+  presence_pole_1: str
+  presence_pole_2: str
+  presence_pole_3: str
+  lux_sensor: str
+  shelly_energy_entity: str
+  experiment_start_date: match(^\d{4}-\d{2}-\d{2}$)

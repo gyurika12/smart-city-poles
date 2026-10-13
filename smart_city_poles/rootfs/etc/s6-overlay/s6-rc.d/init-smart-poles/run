@@ -1,0 +1,151 @@
+#!/usr/bin/with-contenv bashio
+# =============================================================================
+#  Smart City Poles - initialisation
+#  1. Renders the energy-experiment package and the control automation from
+#     the add-on options into /config/packages/
+#  2. Makes sure configuration.yaml loads the packages directory
+#  3. Validates the config and reloads (or asks for a restart)
+# =============================================================================
+
+CONFIG_DIR="/config"
+PKG_DIR="${CONFIG_DIR}/packages"
+CONF_YAML="${CONFIG_DIR}/configuration.yaml"
+ENERGY_TPL="/usr/src/kolones_energy.yaml.tpl"
+AUTOMATION_TPL="/usr/src/kolones_automation.yaml.tpl"
+ENERGY_PKG="${PKG_DIR}/smart_city_poles_energy.yaml"
+AUTOMATION_PKG="${PKG_DIR}/smart_city_poles_automation.yaml"
+
+HA_API="http://supervisor/core/api"
+
+# -----------------------------------------------------------------------------
+# Helpers
+# -----------------------------------------------------------------------------
+ha_notify() {
+    # $1 = message (single line, no double quotes)
+    curl -sS -X POST \
+        -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "{\"title\": \"Smart City Poles\", \"notification_id\": \"smart_city_poles_setup\", \"message\": \"$1\"}" \
+        "${HA_API}/services/persistent_notification/create" > /dev/null || true
+}
+
+render() {
+    # $1 = template, $2 = destination
+    sed -e "s|__LIGHT1__|${LIGHT1}|g" \
+        -e "s|__LIGHT2__|${LIGHT2}|g" \
+        -e "s|__LIGHT3__|${LIGHT3}|g" \
+        -e "s|__PRESENCE1__|${PRESENCE1}|g" \
+        -e "s|__PRESENCE2__|${PRESENCE2}|g" \
+        -e "s|__PRESENCE3__|${PRESENCE3}|g" \
+        -e "s|__LUX_SENSOR__|${LUX_SENSOR}|g" \
+        -e "s|__SHELLY_ENERGY__|${SHELLY_ENERGY}|g" \
+        -e "s|__START_DATE__|${START_DATE}|g" \
+        "$1" > "$2"
+}
+
+# -----------------------------------------------------------------------------
+# Read options
+# -----------------------------------------------------------------------------
+INSTALL_AUTOMATION=$(bashio::config 'install_automation')
+INSTALL_ENERGY=$(bashio::config 'install_energy_package')
+LIGHT1=$(bashio::config 'light_pole_1')
+LIGHT2=$(bashio::config 'light_pole_2')
+LIGHT3=$(bashio::config 'light_pole_3')
+PRESENCE1=$(bashio::config 'presence_pole_1')
+PRESENCE2=$(bashio::config 'presence_pole_2')
+PRESENCE3=$(bashio::config 'presence_pole_3')
+LUX_SENSOR=$(bashio::config 'lux_sensor')
+SHELLY_ENERGY=$(bashio::config 'shelly_energy_entity')
+START_DATE=$(bashio::config 'experiment_start_date')
+
+NEEDS_RESTART=0
+CHANGED=0
+
+mkdir -p "${PKG_DIR}"
+
+
+# -----------------------------------------------------------------------------
+# 1. Energy package (helpers + meters + sensors)
+# -----------------------------------------------------------------------------
+if bashio::var.true "${INSTALL_ENERGY}"; then
+    bashio::log.info "Writing energy package to ${ENERGY_PKG}"
+    render "${ENERGY_TPL}" "${ENERGY_PKG}"
+    CHANGED=1
+else
+    if [ -f "${ENERGY_PKG}" ]; then
+        bashio::log.warning "install_energy_package is off - removing ${ENERGY_PKG}"
+        rm -f "${ENERGY_PKG}"
+        CHANGED=1
+        NEEDS_RESTART=1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# 2. Control automation (needs the helpers from the energy package)
+# -----------------------------------------------------------------------------
+if bashio::var.true "${INSTALL_AUTOMATION}"; then
+    if bashio::var.false "${INSTALL_ENERGY}"; then
+        bashio::log.warning "The automation needs the helpers (input_select.kolones_mode, counter, timers). Make sure they exist - e.g. from a manual install of the energy package."
+    fi
+    bashio::log.info "Writing control automation to ${AUTOMATION_PKG}"
+    render "${AUTOMATION_TPL}" "${AUTOMATION_PKG}"
+    CHANGED=1
+else
+    if [ -f "${AUTOMATION_PKG}" ]; then
+        bashio::log.warning "install_automation is off - removing ${AUTOMATION_PKG}"
+        rm -f "${AUTOMATION_PKG}"
+        CHANGED=1
+        NEEDS_RESTART=1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# 3. Make sure configuration.yaml includes the packages directory
+# -----------------------------------------------------------------------------
+if [ "${CHANGED}" -eq 1 ] && [ -f "${CONF_YAML}" ]; then
+    if grep -qE '^[[:space:]]*packages:[[:space:]]*!include_dir_(named|merged)[[:space:]]+packages' "${CONF_YAML}"; then
+        bashio::log.info "configuration.yaml already loads the packages directory"
+    else
+        BACKUP="${CONF_YAML}.smart-poles-backup-$(date +%Y%m%d-%H%M%S)"
+        bashio::log.warning "configuration.yaml does not load packages - backing up to ${BACKUP} and adding the include"
+        cp "${CONF_YAML}" "${BACKUP}"
+        if grep -q '^homeassistant:' "${CONF_YAML}"; then
+            awk '/^homeassistant:/ && !done { print; print "  packages: !include_dir_named packages"; done=1; next } { print }' \
+                "${CONF_YAML}" > "${CONF_YAML}.tmp" && mv "${CONF_YAML}.tmp" "${CONF_YAML}"
+        else
+            printf '\nhomeassistant:\n  packages: !include_dir_named packages\n' >> "${CONF_YAML}"
+        fi
+        # The homeassistant: block is only read at boot
+        NEEDS_RESTART=1
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+# 4. Validate configuration and reload / ask for restart
+# -----------------------------------------------------------------------------
+if [ "${CHANGED}" -eq 1 ]; then
+    bashio::log.info "Checking Home Assistant configuration..."
+    CHECK=$(curl -sS -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        "${HA_API}/config/core/check_config" || echo '{"result":"unknown"}')
+    RESULT=$(echo "${CHECK}" | jq -r '.result // "unknown"')
+    ERRORS=$(echo "${CHECK}" | jq -r '.errors // empty' | head -c 600)
+
+    if [ "${RESULT}" = "valid" ]; then
+        if [ "${NEEDS_RESTART}" -eq 1 ]; then
+            bashio::log.warning "Configuration valid. A full Home Assistant restart is required."
+            ha_notify "Τα αρχεία των Smart City Poles εγκαταστάθηκαν στο /config/packages/ και το configuration.yaml ενημερώθηκε (backup δίπλα του). Χρειάζεται **μία πλήρη επανεκκίνηση** του Home Assistant (Settings > System > Restart) για να φορτώσουν τα packages."
+        else
+            bashio::log.info "Configuration valid - reloading..."
+            curl -sS -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+                "${HA_API}/services/homeassistant/reload_all" > /dev/null || true
+            ha_notify "Τα packages των Smart City Poles (ενέργεια + αυτοματισμός) εγκαταστάθηκαν και φορτώθηκαν χωρίς restart. Δες τα entities kolones_* και τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος»."
+        fi
+    else
+        bashio::log.error "Configuration check failed: ${ERRORS}"
+        ha_notify "ΠΡΟΣΟΧΗ: το check configuration απέτυχε μετά την εγκατάσταση των Smart City Poles. Σφάλμα: ${ERRORS:-άγνωστο}. Δες το log του add-on, διόρθωσε τις ρυθμίσεις (Configuration tab) και κάνε restart το add-on."
+    fi
+else
+    bashio::log.info "Nothing to install (both install options are off) - dashboard only."
+fi
+
+bashio::log.info "Smart City Poles initialisation finished."

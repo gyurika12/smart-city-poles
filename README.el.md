@@ -142,6 +142,20 @@ tools/             Script για το PDF σύγκρισης και για αφ�
 
 > **Σημείωση:** στα αρχεία YAML του Home Assistant, αντικατέστησε το `shellyem_xxxxxxxxxxxx` με το entity ID του δικού σου Shelly EM.
 
+## Add-on για το Home Assistant
+
+Αυτό το repository λειτουργεί και ως **add-on repository** του Home Assistant.
+Το add-on **Smart City Poles** σου δίνει:
+
+- το ζωντανό dashboard (χάρτης + γραφήματα) στο **sidebar** του Home Assistant μέσω ingress — χωρίς αντιγραφή στο `config/www/`,
+- **αυτόματη εγκατάσταση** του αυτοματισμού ελέγχου και του πακέτου πειράματος ενέργειας στο `config/packages/`, με όλα τα entity IDs (λάμπες, Shelly EM, αισθητήρες lux/παρουσίας) ρυθμιζόμενα από τις επιλογές του add-on.
+
+**Εγκατάσταση:** Ρυθμίσεις → Πρόσθετα → Add-on Store → ⋮ → Repositories → πρόσθεσε
+`https://github.com/gyurika12/smart-city-poles` → εγκατάσταση του **Smart City Poles** →
+συμπλήρωσε τα entity IDs σου στην καρτέλα Configuration → Start. Δες το
+[`smart_city_poles/README.md`](smart_city_poles/README.md) και
+[πώς φτιάχτηκε το add-on](smart_city_poles/HOW_IT_WAS_BUILT.md).
+
 ## Τεκμηρίωση
 
 - [Τεχνική τεκμηρίωση λογισμικού](docs/code-documentation_el.pdf) — αντιστοίχιση κώδικα σε κεφάλαια, αισθητήρες, πρωτόκολλο MQTT, πείραμα ενέργειας, πλήρης κατάλογος topics.
