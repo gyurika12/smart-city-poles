@@ -1,0 +1,103 @@
+name: Add-on CI
+
+on:
+  push:
+    paths:
+      - "smart_city_poles/**"
+      - "repository.yaml"
+      - ".github/workflows/addon-ci.yaml"
+  pull_request:
+    paths:
+      - "smart_city_poles/**"
+      - "repository.yaml"
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint add-on files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate YAML files
+        run: |
+          python3 - <<'EOF'
+          import glob, sys
+          import yaml
+
+          files = (
+              ["repository.yaml", "smart_city_poles/config.yaml", "smart_city_poles/build.yaml"]
+              + glob.glob("smart_city_poles/translations/*.yaml")
+          )
+          for f in files:
+              with open(f) as fh:
+                  yaml.safe_load(fh)
+              print(f"{f} OK")
+
+          cfg = yaml.safe_load(open("smart_city_poles/config.yaml"))
+          assert set(cfg["options"]) == set(cfg["schema"]), "options/schema mismatch"
+          assert cfg["ingress_port"] == 8099
+          assert cfg["ingress"] is True
+          print("config.yaml options <-> schema OK")
+          EOF
+
+      - name: Bash syntax check
+        run: |
+          bash -n smart_city_poles/rootfs/etc/s6-overlay/s6-rc.d/init-smart-poles/run
+          bash -n smart_city_poles/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
+          echo "bash syntax OK"
+
+      - name: Render package templates and validate
+        run: |
+          python3 - <<'EOF'
+          import yaml
+
+          subs = {
+              "__LIGHT1__": "light.test1", "__LIGHT2__": "light.test2", "__LIGHT3__": "light.test3",
+              "__PRESENCE1__": "binary_sensor.p1", "__PRESENCE2__": "binary_sensor.p2",
+              "__PRESENCE3__": "binary_sensor.p3", "__LUX_SENSOR__": "sensor.lux",
+              "__SHELLY_ENERGY__": "sensor.shelly_energy", "__START_DATE__": "2026-09-14",
+          }
+          for tpl in ("kolones_energy", "kolones_automation"):
+              src = f"smart_city_poles/rootfs/usr/src/{tpl}.yaml.tpl"
+              text = open(src).read()
+              for k, v in subs.items():
+                  text = text.replace(k, v)
+              leftover = [k for k in subs if k in text]
+              assert not leftover, f"leftover placeholders in {tpl}: {leftover}"
+              data = yaml.safe_load(text)
+              print(tpl, "->", list(data.keys()))
+
+          auto = yaml.safe_load(
+              open("smart_city_poles/rootfs/usr/src/kolones_automation.yaml.tpl").read()
+              .replace("__LIGHT1__", "light.test1").replace("__LIGHT2__", "light.test2")
+              .replace("__LIGHT3__", "light.test3").replace("__PRESENCE1__", "binary_sensor.p1")
+              .replace("__PRESENCE2__", "binary_sensor.p2").replace("__PRESENCE3__", "binary_sensor.p3")
+              .replace("__LUX_SENSOR__", "sensor.lux")
+          )["automation"][0]
+          assert len(auto["triggers"]) == 9, "automation triggers changed?"
+          assert len(auto["actions"][0]["choose"]) == 4, "automation branches changed?"
+          print("automation integrity OK (9 triggers, 4 choose branches)")
+          EOF
+
+      - name: Dashboard present and wired for same-origin
+        run: |
+          test -s smart_city_poles/rootfs/www/index.html
+          grep -q "location.origin" smart_city_poles/rootfs/www/index.html
+          grep -q "/api/websocket" smart_city_poles/rootfs/www/index.html
+          echo "dashboard OK"
+
+  build:
+    name: Build add-on image (amd64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker build
+        run: |
+          docker build \
+            --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22 \
+            --tag smart-city-poles:test \
+            smart_city_poles/
