@@ -4,26 +4,28 @@ on:
   push:
     paths:
       - "smart_city_poles/**"
+      - "tests/addon/**"
       - "repository.yaml"
       - ".github/workflows/addon-ci.yaml"
   pull_request:
     paths:
       - "smart_city_poles/**"
+      - "tests/addon/**"
       - "repository.yaml"
   workflow_dispatch:
 
 jobs:
   lint:
-    name: Lint add-on files
+    name: Lint and render tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate YAML files
+      - name: Validate YAML files and config schema
         run: |
           python3 - <<'EOF'
-          import glob, sys
+          import glob
           import yaml
 
           files = (
@@ -39,92 +41,85 @@ jobs:
           assert set(cfg["options"]) == set(cfg["schema"]), "options/schema mismatch"
           assert cfg["ingress_port"] == 8099
           assert cfg["ingress"] is True
-          print("config.yaml options <-> schema OK")
+          for lang in glob.glob("smart_city_poles/translations/*.yaml"):
+              tr = yaml.safe_load(open(lang))["configuration"]
+              missing = set(cfg["schema"]) - set(tr)
+              assert not missing, f"{lang}: untranslated options {missing}"
+          print("config.yaml options <-> schema <-> translations OK")
           EOF
 
-      - name: Bash syntax check
+      - name: Shell syntax check
         run: |
-          bash -n smart_city_poles/rootfs/etc/s6-overlay/s6-rc.d/init-smart-poles/run
-          bash -n smart_city_poles/rootfs/etc/s6-overlay/s6-rc.d/nginx/run
-          echo "bash syntax OK"
+          for f in smart_city_poles/rootfs/etc/s6-overlay/s6-rc.d/*/run \
+                   smart_city_poles/rootfs/usr/bin/smart-poles-render; do
+            bash -n "$f" && echo "$f OK"
+          done
 
-      - name: Render package templates and validate
+      - name: Render with the default options
         run: |
-          python3 - <<'EOF'
-          import yaml
+          python3 -c "
+          import json, yaml
+          o = yaml.safe_load(open('smart_city_poles/config.yaml'))['options']
+          o['install_energy_package'] = True
+          o['shelly_energy_entity'] = 'sensor.shelly_energy'
+          json.dump(o, open('/tmp/options-default.json', 'w'))
+          "
+          smart_city_poles/rootfs/usr/bin/smart-poles-render /tmp/options-default.json \
+            smart_city_poles/rootfs/usr/src /tmp/out-default /tmp/out-default/config.json
+          python3 tests/addon/check_render.py /tmp/out-default /tmp/options-default.json
 
-          subs = {
-              "__LIGHT1__": "light.test1", "__LIGHT2__": "light.test2", "__LIGHT3__": "light.test3",
-              "__PRESENCE1__": "binary_sensor.p1", "__PRESENCE2__": "binary_sensor.p2",
-              "__PRESENCE3__": "binary_sensor.p3", "__LUX_SENSOR__": "sensor.lux",
-              "__SHELLY_ENERGY__": "sensor.shelly_energy", "__START_DATE__": "2026-09-14",
+      - name: Render with 5 poles and custom neighbours
+        run: |
+          smart_city_poles/rootfs/usr/bin/smart-poles-render tests/addon/options-5-poles.json \
+            smart_city_poles/rootfs/usr/src /tmp/out-5 /tmp/out-5/config.json
+          python3 tests/addon/check_render.py /tmp/out-5 tests/addon/options-5-poles.json
+
+      - name: Invalid options are rejected
+        run: |
+          set +e
+          fail() { echo "expected failure for: $1"; exit 1; }
+          check() {
+            jq "$2" tests/addon/options-5-poles.json > /tmp/bad.json
+            smart_city_poles/rootfs/usr/bin/smart-poles-render /tmp/bad.json \
+              smart_city_poles/rootfs/usr/src /tmp/out-bad 2>/tmp/err && fail "$1"
+            grep -q "$3" /tmp/err || { cat /tmp/err; fail "$1 (message)"; }
+            echo "rejected: $1"
           }
-          for tpl in ("kolones_energy", "kolones_automation"):
-              src = f"smart_city_poles/rootfs/usr/src/{tpl}.yaml.tpl"
-              text = open(src).read()
-              for k, v in subs.items():
-                  text = text.replace(k, v)
-              leftover = [k for k in subs if k in text]
-              assert not leftover, f"leftover placeholders in {tpl}: {leftover}"
-              data = yaml.safe_load(text)
-              print(tpl, "->", list(data.keys()))
+          check "duplicate id"        '.poles[1].id = "p1"'              'used more than once'
+          check "unknown neighbour"   '.poles[0].neighbors = "p9"'       'not a configured pole id'
+          check "self neighbour"      '.poles[0].neighbors = "p1"'       'own neighbor'
+          check "non-light lamp"      '.poles[0].light = "switch.x"'     'must be a light'
+          check "shared presence"     '.poles[1].presence = .poles[0].presence' 'more than one pole'
+          check "lux thresholds"      '.lux_night_below = 80'            'must be lower'
+          check "no poles"            '.poles = []'                      'at least one pole'
 
-          auto = yaml.safe_load(
-              open("smart_city_poles/rootfs/usr/src/kolones_automation.yaml.tpl").read()
-              .replace("__LIGHT1__", "light.test1").replace("__LIGHT2__", "light.test2")
-              .replace("__LIGHT3__", "light.test3").replace("__PRESENCE1__", "binary_sensor.p1")
-              .replace("__PRESENCE2__", "binary_sensor.p2").replace("__PRESENCE3__", "binary_sensor.p3")
-              .replace("__LUX_SENSOR__", "sensor.lux")
-          )["automation"][0]
-          assert len(auto["triggers"]) == 9, "automation triggers changed?"
-          assert len(auto["actions"][0]["choose"]) == 4, "automation branches changed?"
-          print("automation integrity OK (9 triggers, 4 choose branches)")
-          EOF
-
-      - name: Dashboard present and wired for same-origin
+      - name: Dashboard is self-contained and config driven
         run: |
-          test -s smart_city_poles/rootfs/www/index.html
-          grep -q "location.origin" smart_city_poles/rootfs/www/index.html
-          grep -q "/api/websocket" smart_city_poles/rootfs/www/index.html
-          grep -q "hassio_ingress" smart_city_poles/rootfs/www/index.html
-          grep -q "const USE_WEBSOCKET = !INGRESS" smart_city_poles/rootfs/www/index.html
+          f=smart_city_poles/rootfs/www/index.html
+          test -s "$f"
+          grep -q 'vendor/leaflet.js' "$f"
+          grep -q 'vendor/chart.umd.min.js' "$f"
+          grep -q "config.json" "$f"
+          ! grep -E '<(script|link)[^>]+https?://' "$f" || { echo "external script/style found"; exit 1; }
           echo "dashboard OK"
 
-      - name: Validate InfluxDB and Grafana templates
+      - name: Validate Grafana templates
         run: |
           python3 - <<'EOF'
           import json, yaml
-
-          class L(yaml.SafeLoader):
-              pass
-          L.add_multi_constructor('!', lambda l, s, n: None)
-
-          influx = yaml.load(open("smart_city_poles/rootfs/usr/src/kolones_influxdb.yaml.tpl"), Loader=L)
-          assert influx["influxdb"]["database"] == "kolones"
-          print("influxdb package OK")
 
           ds = open("smart_city_poles/rootfs/usr/src/grafana/datasource.yaml.tpl").read()
           ds = ds.replace("__INFLUX_USER__", "grafana").replace("__INFLUX_PASS__", "secret")
           ds = yaml.safe_load(ds)
           assert ds["datasources"][0]["uid"] == "influxdb-kolones"
-          print("grafana datasource OK")
 
           prov = yaml.safe_load(open("smart_city_poles/rootfs/usr/src/grafana/dashboards_provider.yaml"))
           assert prov["providers"][0]["options"]["path"] == "/share/grafana-provisioning/dashboards"
-          print("grafana provider OK")
 
           raw = open("smart_city_poles/rootfs/usr/src/grafana/kolones-patras.json").read()
-          rendered_text = raw.replace("${DS_INFLUXDB}", "influxdb-kolones")
-          assert "${DS_INFLUXDB}" not in rendered_text, "unresolved datasource placeholder"
-          rendered = json.loads(rendered_text)
-          print("grafana dashboard OK:", rendered["title"], "| panels:", len(rendered["panels"]))
+          rendered = json.loads(raw.replace("${DS_INFLUXDB}", "influxdb-kolones"))
+          print("grafana OK:", rendered["title"], "| panels:", len(rendered["panels"]))
           EOF
-
-      - name: Nginx template has token placeholder
-        run: |
-          grep -q "__SUPERVISOR_TOKEN__" smart_city_poles/rootfs/etc/nginx/http.d/ingress.conf.tpl
-          grep -q "proxy_pass http://supervisor/core" smart_city_poles/rootfs/etc/nginx/http.d/ingress.conf.tpl
-          echo "nginx template OK"
 
   build:
     name: Build add-on image (amd64)
@@ -139,3 +134,15 @@ jobs:
             --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.22 \
             --tag smart-city-poles:test \
             smart_city_poles/
+
+      - name: nginx config is valid and the renderer runs inside the image
+        run: |
+          docker run --rm --entrypoint /bin/sh \
+            -v "$PWD/tests/addon:/tests:ro" smart-city-poles:test -c '
+              set -e
+              echo "127.0.0.1 supervisor" >> /etc/hosts
+              sed "s|__SUPERVISOR_TOKEN__|test|g" /etc/nginx/http.d/ingress.conf.tpl > /etc/nginx/http.d/ingress.conf
+              nginx -t
+              smart-poles-render /tests/options-5-poles.json /usr/src /tmp/out /www/config.json
+              ls /www/vendor/leaflet.js /www/vendor/chart.umd.min.js /www/config.json
+            '

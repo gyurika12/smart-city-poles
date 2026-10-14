@@ -1,70 +1,106 @@
 configuration:
+  poles:
+    name: Κολόνες
+    description: >-
+      Μία εγγραφή ανά κολόνα, με τη σειρά του δρόμου (το κύμα φωτός πηγαίνει
+      στην προηγούμενη και την επόμενη της λίστας). Πεδία - id: σύντομο
+      μοναδικό αναγνωριστικό (a-z, 0-9, _), name, location (προαιρετικό),
+      latitude, longitude, light: το light.* της λάμπας, presence: το
+      binary_sensor που ανάβει όταν η κολόνα ανιχνεύει διέλευση, status_entity
+      (προαιρετικό): entity που γίνεται unavailable όταν η κολόνα είναι
+      εκτός, entity_match (προαιρετικό): κομμάτια των entity_id της κολόνας
+      χωρισμένα με κόμμα (π.χ. "col1, kolona_1") ώστε το dashboard να βρει
+      τους αισθητήρες της, neighbors (προαιρετικό): ids γειτόνων με κόμμα,
+      αντί για τη σειρά της λίστας, parking_occupied_cm / parking_free_cm
+      (προαιρετικά): ενεργοποιούν την ένδειξη θέσης parking από τον
+      υπερηχητικό αισθητήρα.
+  lux_sensor:
+    name: Αισθητήρας lux (μέρα/νύχτα)
+    description: Ο αισθητήρας φωτεινότητας με τον οποίο ο αυτοματισμός κρίνει μέρα/νύχτα.
+  lux_day_above:
+    name: Όριο μέρας (lux)
+    description: Πάνω από αυτό για 10 s οι λάμπες σβήνουν.
+  lux_night_below:
+    name: Όριο νύχτας (lux)
+    description: >-
+      Κάτω από αυτό για 10 s οι λάμπες ανάβουν. Πρέπει να είναι μικρότερο από
+      το όριο μέρας (το κενό αποτρέπει το τρεμόπαιγμα στο σούρουπο).
+  scenario:
+    name: Σενάριο φωτισμού
+    description: >-
+      adaptive = χαμηλή βάση, ενίσχυση + κύμα σε ανίχνευση (κανονική
+      λειτουργία). baseline = πλήρης φωτεινότητα όλη τη νύχτα. alternate =
+      baseline και adaptive σε εναλλασσόμενες νύχτες, για μέτρηση της
+      εξοικονόμησης.
+  brightness_base:
+    name: Φωτεινότητα βάσης (%)
+    description: Στάθμη νύχτας χωρίς κίνηση (adaptive).
+  brightness_wave:
+    name: Φωτεινότητα κύματος (%)
+    description: Στάθμη των γειτονικών κολονών όταν μια κολόνα ανιχνεύσει κάποιον.
+  brightness_boost:
+    name: Φωτεινότητα ενίσχυσης (%)
+    description: Στάθμη της κολόνας που ανίχνευσε.
+  brightness_baseline:
+    name: Φωτεινότητα baseline (%)
+    description: Στάθμη όλη τη νύχτα στο σενάριο baseline.
+  hold_seconds:
+    name: Χρόνος διατήρησης (δευτερόλεπτα)
+    description: Πόση ώρα μένουν ψηλά οι λάμπες μετά από ανίχνευση πριν γυρίσουν στη βάση.
   install_automation:
     name: Εγκατάσταση αυτοματισμού
     description: >-
-      Εγκαθιστά τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος» (μέρα/νύχτα, κύμα
-      προ-φωτισμού, σενάρια baseline/adaptive) ως package στο /config/packages/.
-      Χρειάζεται τα helpers του energy package.
+      Εγκαθιστά τα helpers και τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος»
+      (μέρα/νύχτα, κύμα, σενάρια) ως packages στο /config/packages/.
   install_energy_package:
     name: Εγκατάσταση energy package
     description: >-
-      Εγκαθιστά helpers, utility_meter τιμολόγια, history_stats και template
-      sensors για το πείραμα εξοικονόμησης ενέργειας στο /config/packages/.
-  light_pole_1:
-    name: Λάμπα κολώνας 1
-    description: Το light entity που ελέγχει τη λάμπα της κολώνας 1 (π.χ. Yeelight).
-  light_pole_2:
-    name: Λάμπα κολώνας 2
-    description: Το light entity που ελέγχει τη λάμπα της κολώνας 2.
-  light_pole_3:
-    name: Λάμπα κολώνας 3
-    description: Το light entity που ελέγχει τη λάμπα της κολώνας 3.
-  presence_pole_1:
-    name: Αισθητήρας παρουσίας κολώνας 1
-    description: Binary sensor που ανάβει όταν η κολώνα 1 ανιχνεύει διέλευση.
-  presence_pole_2:
-    name: Αισθητήρας παρουσίας κολώνας 2
-    description: Binary sensor που ανάβει όταν η κολώνα 2 ανιχνεύει διέλευση.
-  presence_pole_3:
-    name: Αισθητήρας παρουσίας κολώνας 3
-    description: Binary sensor που ανάβει όταν η κολώνα 3 ανιχνεύει διέλευση.
-  lux_sensor:
-    name: Αισθητήρας lux (μέρα/νύχτα)
-    description: Αισθητήρας φωτεινότητας που αποφασίζει μέρα/νύχτα στον αυτοματισμό.
+      Εγκαθιστά utility_meter τιμολόγια, history_stats και template sensors
+      που μετρούν την εξοικονόμηση ανά σενάριο. Χρειάζεται τον αισθητήρα
+      ενέργειας.
   shelly_energy_entity:
-    name: Αισθητήρας ενέργειας Shelly
+    name: Αισθητήρας ενέργειας (kWh)
     description: >-
-      Το entity ενέργειας (kWh) του καναλιού του Shelly EM που τροφοδοτεί τις
-      τρεις λάμπες, π.χ. sensor.shellyem_xxxxxxxxxxxx_channel_1_energy.
+      Το entity ενέργειας του μετρητή που τροφοδοτεί τις λάμπες, π.χ.
+      sensor.shellyem_xxxxxxxxxxxx_channel_1_energy. Απαιτείται από το
+      energy package.
   experiment_start_date:
     name: Ημερομηνία έναρξης πειράματος
     description: >-
-      Ημερομηνία έναρξης (ΕΕΕΕ-ΜΜ-ΗΗ) για τη μέτρηση ωρών ανά σενάριο.
-      Όχι στο μέλλον!
+      Ημερομηνία έναρξης (YYYY-MM-DD) για τη μέτρηση ωρών ανά σενάριο.
+      Δεν πρέπει να είναι στο μέλλον.
   install_influxdb:
-    name: Εγκατάσταση InfluxDB config
+    name: Εγκατάσταση ρυθμίσεων InfluxDB
     description: >-
-      Γράφει το block του influxdb integration (API v1, βάση kolones) ως
-      package. Απαιτεί το add-on InfluxDB και το influxdb_password στο
-      secrets.yaml. Χρειάζεται πλήρης επανεκκίνηση.
+      Γράφει το block της ενσωμάτωσης influxdb (API v1, βάση kolones) ως
+      package. Χρειάζεται το add-on InfluxDB και influxdb_password στο
+      secrets.yaml. Απαιτείται πλήρης επανεκκίνηση.
   install_grafana:
-    name: Προετοιμασία Grafana provisioning
+    name: Προετοιμασία Grafana
     description: >-
       Γράφει έτοιμο datasource (InfluxDB-Kolones) και το dashboard των
-      κολώνων (29 panels) στο /share/grafana-provisioning. Μετά δείξε το
-      Grafana add-on εκεί με env var GF_PATHS_PROVISIONING=/share/grafana-provisioning
+      κολονών στο /share/grafana-provisioning. Μετά δείξε εκεί το add-on
+      Grafana με τη μεταβλητή GF_PATHS_PROVISIONING=/share/grafana-provisioning
       (δες την ειδοποίηση μετά την εγκατάσταση).
   influx_reader_user:
     name: Χρήστης ανάγνωσης InfluxDB
-    description: Ο χρήστης InfluxDB που θα διαβάζει τη βάση kolones για το Grafana.
+    description: Ο χρήστης InfluxDB με τον οποίο το Grafana διαβάζει τη βάση kolones.
   influx_reader_password:
     name: Κωδικός χρήστη ανάγνωσης InfluxDB
     description: Ο κωδικός του χρήστη ανάγνωσης (για το datasource του Grafana).
   watchdog:
-    name: Watchdog κολώνων
+    name: Επιτήρηση κολονών
     description: >-
-      Παρακολουθεί τις τρεις κολόνες και στέλνει ειδοποίηση όταν κάποια πέσει
-      εκτός σύνδεσης (unavailable) και όταν επανέλθει.
+      Παρακολουθεί κάθε κολόνα και στέλνει ειδοποίηση όταν βγει εκτός
+      σύνδεσης (unavailable) και όταν επανέλθει.
   watchdog_poll_seconds:
-    name: Περίοδος ελέγχου watchdog (δευτ.)
-    description: Κάθε πόσα δευτερόλεπτα ελέγχει τις κολόνες (15-3600).
+    name: Συχνότητα ελέγχου επιτήρησης (δευτερόλεπτα)
+    description: Κάθε πόσο ελέγχει τις κολόνες η επιτήρηση (15-3600 s).
+  demo_poles:
+    name: Demo κολόνες
+    description: >-
+      Προσθέτει 7 προσομοιωμένες κολόνες στον χάρτη, για παρουσιάσεις.
+      Σημειώνονται καθαρά ως «demo» και δεν αγγίζουν το Home Assistant.
+  map_zoom:
+    name: Zoom χάρτη
+    description: Μέγιστο αρχικό zoom του χάρτη στο dashboard (3-19).

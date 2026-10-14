@@ -1,41 +1,66 @@
 configuration:
-  install_automation:
-    name: Install control automation
+  poles:
+    name: Poles
     description: >-
-      Installs the "Poles - Full control" automation (day/night, pre-light wave,
-      baseline/adaptive scenarios) as a package in /config/packages/.
-      Requires the helpers from the energy package.
-  install_energy_package:
-    name: Install energy package
-    description: >-
-      Installs helpers, utility_meter tariffs, history_stats and template
-      sensors for the energy-saving experiment into /config/packages/.
-  light_pole_1:
-    name: Pole 1 light entity
-    description: Light entity that controls the lamp of pole 1 (e.g. Yeelight).
-  light_pole_2:
-    name: Pole 2 light entity
-    description: Light entity that controls the lamp of pole 2.
-  light_pole_3:
-    name: Pole 3 light entity
-    description: Light entity that controls the lamp of pole 3.
-  presence_pole_1:
-    name: Pole 1 presence sensor
-    description: Binary sensor that turns on when pole 1 detects a passer-by.
-  presence_pole_2:
-    name: Pole 2 presence sensor
-    description: Binary sensor that turns on when pole 2 detects a passer-by.
-  presence_pole_3:
-    name: Pole 3 presence sensor
-    description: Binary sensor that turns on when pole 3 detects a passer-by.
+      One entry per pole, in street order (the light wave goes to the previous
+      and next pole in this list). Fields - id: short unique id (a-z, 0-9, _),
+      name, location (optional), latitude, longitude, light: the lamp's
+      light.* entity, presence: the binary_sensor that turns on when the pole
+      detects a passer-by, status_entity (optional): an entity that becomes
+      unavailable when the pole is offline, entity_match (optional):
+      comma-separated parts of entity ids that belong to this pole (e.g.
+      "col1, kolona_1") so the dashboard finds its sensors, neighbors
+      (optional): comma-separated pole ids that override the list order,
+      parking_occupied_cm / parking_free_cm (optional): enable the parking
+      spot indicator from the ultrasonic distance.
   lux_sensor:
     name: Lux sensor (day/night)
     description: Illuminance sensor used by the automation to decide day/night.
-  shelly_energy_entity:
-    name: Shelly energy sensor
+  lux_day_above:
+    name: Day threshold (lux)
+    description: Above this level for 10 s the lamps turn off.
+  lux_night_below:
+    name: Night threshold (lux)
     description: >-
-      Energy (kWh) entity of the Shelly EM channel that feeds the three lamps,
-      e.g. sensor.shellyem_xxxxxxxxxxxx_channel_1_energy.
+      Below this level for 10 s the lamps turn on. Must be lower than the day
+      threshold (the gap prevents flicker at dusk).
+  scenario:
+    name: Lighting scenario
+    description: >-
+      adaptive = dimmed base level, boost + light wave on detection (normal
+      operation). baseline = full brightness all night. alternate = baseline
+      and adaptive on alternate nights, to measure the energy saving.
+  brightness_base:
+    name: Base brightness (%)
+    description: Night level when nobody is around (adaptive).
+  brightness_wave:
+    name: Wave brightness (%)
+    description: Level of the neighbouring poles when a pole detects someone.
+  brightness_boost:
+    name: Boost brightness (%)
+    description: Level of the pole that detected someone.
+  brightness_baseline:
+    name: Baseline brightness (%)
+    description: Level all night in the baseline scenario.
+  hold_seconds:
+    name: Hold time (seconds)
+    description: How long boosted / wave lamps stay up before returning to base.
+  install_automation:
+    name: Install control automation
+    description: >-
+      Installs the helpers and the "Poles - Full control" automation (day/night,
+      light wave, scenarios) as packages in /config/packages/.
+  install_energy_package:
+    name: Install energy package
+    description: >-
+      Installs utility_meter tariffs, history_stats and template sensors that
+      measure the energy saving per scenario. Needs the Shelly energy sensor.
+  shelly_energy_entity:
+    name: Energy sensor (kWh)
+    description: >-
+      Energy entity of the meter that feeds the lamps, e.g.
+      sensor.shellyem_xxxxxxxxxxxx_channel_1_energy. Required by the energy
+      package.
   experiment_start_date:
     name: Experiment start date
     description: >-
@@ -50,10 +75,10 @@ configuration:
   install_grafana:
     name: Prepare Grafana provisioning
     description: >-
-      Writes a ready datasource (InfluxDB-Kolones) and the 29-panel poles
-      dashboard to /share/grafana-provisioning. Then point the Grafana add-on
-      there with the env var GF_PATHS_PROVISIONING=/share/grafana-provisioning
-      (see the notification after install).
+      Writes a ready datasource (InfluxDB-Kolones) and the poles dashboard to
+      /share/grafana-provisioning. Then point the Grafana add-on there with the
+      env var GF_PATHS_PROVISIONING=/share/grafana-provisioning (see the
+      notification after install).
   influx_reader_user:
     name: InfluxDB reader user
     description: InfluxDB user that Grafana will use to read the kolones database.
@@ -63,8 +88,16 @@ configuration:
   watchdog:
     name: Pole watchdog
     description: >-
-      Monitors the three poles and sends a notification when one goes offline
+      Monitors every pole and sends a notification when one goes offline
       (unavailable) and when it recovers.
   watchdog_poll_seconds:
     name: Watchdog poll interval (seconds)
     description: How often the watchdog checks the poles (15-3600 s).
+  demo_poles:
+    name: Demo poles
+    description: >-
+      Adds 7 simulated poles to the dashboard map, for presentations. They
+      are clearly marked "demo" and never touch Home Assistant.
+  map_zoom:
+    name: Map zoom
+    description: Maximum initial zoom of the dashboard map (3-19).

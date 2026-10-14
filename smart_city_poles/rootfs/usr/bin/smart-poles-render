@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+# =============================================================================
+#  Smart City Poles - renderer
+#  Turns the add-on options (/data/options.json) into:
+#    - Home Assistant packages (helpers, control automation, energy, InfluxDB)
+#    - the dashboard configuration (config.json)
+#  Pure bash + jq and no Supervisor access, so CI can run it on a sample
+#  options file and validate the output.
+#
+#  Usage: smart-poles-render OPTIONS_JSON TEMPLATE_DIR OUT_DIR [DASHBOARD_JSON]
+#  Writes into OUT_DIR only the packages that are enabled in the options.
+#  Exits non-zero with a readable message when the options are invalid.
+# =============================================================================
+set -euo pipefail
+shopt -u patsub_replacement 2>/dev/null || true   # bash >= 5.2: '&' is literal
+
+OPTS="$1"
+SRC="$2"
+OUT="$3"
+DASH_JSON="${4:-}"
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+warn() { echo "WARNING: $*" >&2; }
+opt() { jq -r "$1" "${OPTS}"; }
+
+[ -f "${OPTS}" ] || die "options file ${OPTS} not found"
+mkdir -p "${OUT}"
+
+# -----------------------------------------------------------------------------
+# 1. Validate the pole list
+# -----------------------------------------------------------------------------
+ENTITY_RE='^[a-z_]+\.[a-z0-9_]+$'
+
+POLE_COUNT=$(opt '.poles | length')
+[ "${POLE_COUNT}" -ge 1 ] || die "at least one pole must be configured (option 'poles')"
+
+ERRORS=$(jq -r --arg re "${ENTITY_RE}" '
+  .poles as $p
+  | ($p | map(.id)) as $ids
+  | [
+      ($ids | group_by(.) | map(select(length > 1) | .[0])
+        | .[] | "pole id \"\(.)\" is used more than once"),
+      ($p | map(.light) | group_by(.) | map(select(length > 1) | .[0])
+        | .[] | "light \(.) is assigned to more than one pole"),
+      ($p | map(.presence) | group_by(.) | map(select(length > 1) | .[0])
+        | .[] | "presence sensor \(.) is assigned to more than one pole"),
+      ($p[] | . as $x
+        | (["light", "presence", "status_entity"][] as $k
+            | ($x[$k] // "") as $v
+            | select($v != "" and ($v | test($re) | not))
+            | "pole \($x.id): \($k) \"\($v)\" is not a valid entity id"),
+          (select(($x.light // "") | startswith("light.") | not)
+            | "pole \($x.id): light must be a light.* entity"),
+          ((($x.neighbors // "") | gsub("\\s"; "") | split(",") | map(select(. != "")))[]
+            | select(. as $n | $ids | index($n) | not)
+            | "pole \($x.id): neighbor \"\(.)\" is not a configured pole id"),
+          ((($x.neighbors // "") | gsub("\\s"; "") | split(","))[]
+            | select(. == $x.id)
+            | "pole \($x.id): a pole cannot be its own neighbor"))
+    ]
+  | .[]' "${OPTS}")
+[ -z "${ERRORS}" ] || die "invalid pole configuration:
+${ERRORS}"
+
+LUX_SENSOR=$(opt '.lux_sensor')
+[[ "${LUX_SENSOR}" =~ ${ENTITY_RE} ]] || die "lux_sensor \"${LUX_SENSOR}\" is not a valid entity id"
+
+LUX_DAY=$(opt '.lux_day_above')
+LUX_NIGHT=$(opt '.lux_night_below')
+jq -e '.lux_night_below < .lux_day_above' "${OPTS}" > /dev/null \
+    || die "lux_night_below (${LUX_NIGHT}) must be lower than lux_day_above (${LUX_DAY})"
+
+# -----------------------------------------------------------------------------
+# 2. Derived values (JSON is valid YAML flow syntax, so lists/maps are
+#    inserted into the templates as JSON)
+# -----------------------------------------------------------------------------
+pct() { jq -r "(.$1 * 255 / 100 | round)" "${OPTS}"; }
+
+# Per presence sensor: its light + timer and the lights/timers of its
+# neighbours. Neighbours default to the previous/next pole in list order.
+POLES_MAP=$(jq -c '
+  .poles as $p
+  | [ $p | to_entries[] | .key as $i | .value as $v
+      | (($v.neighbors // "") | gsub("\\s"; "") | split(",") | map(select(. != ""))) as $explicit
+      | (if ($explicit | length) > 0 then $explicit
+         else [ (if $i > 0 then $p[$i - 1].id else empty end),
+                (if $i < ($p | length) - 1 then $p[$i + 1].id else empty end) ]
+         end) as $nb
+      | { key: $v.presence,
+          value: { light: $v.light,
+                   timer: ("timer.kolones_" + $v.id),
+                   neighbor_lights: [ $nb[] as $n | $p[] | select(.id == $n) | .light ],
+                   neighbor_timers: [ $nb[] | "timer.kolones_" + . ] } } ]
+  | from_entries' "${OPTS}")
+TIMERS_MAP=$(jq -c '[.poles[] | {key: ("timer.kolones_" + .id), value: .light}] | from_entries' "${OPTS}")
+ALL_LIGHTS=$(jq -c '[.poles[].light]' "${OPTS}")
+PRESENCE_LIST=$(jq -c '[.poles[].presence]' "${OPTS}")
+TIMER_LIST=$(jq -c '[.poles[] | "timer.kolones_" + .id]' "${OPTS}")
+HOLD=$(jq -r '.hold_seconds | [(. / 3600 | floor), (. % 3600 / 60 | floor), (. % 60)]
+              | map(tostring | if length < 2 then "0" + . else . end) | join(":")' "${OPTS}")
+TIMER_HELPERS=$(jq -c --arg hold "${HOLD}" '[.poles[] | {key: ("kolones_" + .id),
+  value: {name: (.name + " - επιστροφή στη βάση"), duration: $hold, restore: false}}] | from_entries' "${OPTS}")
+
+INSTALL_AUTOMATION=$(opt '.install_automation')
+INSTALL_ENERGY=$(opt '.install_energy_package')
+SHELLY_ENERGY=$(opt '.shelly_energy_entity // ""')
+if [ "${INSTALL_ENERGY}" = "true" ] && ! [[ "${SHELLY_ENERGY}" =~ ${ENTITY_RE} ]]; then
+    warn "install_energy_package is on but shelly_energy_entity is empty/invalid - skipping the energy package"
+    INSTALL_ENERGY=false
+fi
+
+fill() {
+    # $1 = template, $2 = destination
+    local t
+    t=$(<"$1")
+    t=${t//__POLES_MAP__/${POLES_MAP}}
+    t=${t//__TIMERS_MAP__/${TIMERS_MAP}}
+    t=${t//__ALL_LIGHTS__/${ALL_LIGHTS}}
+    t=${t//__PRESENCE_LIST__/${PRESENCE_LIST}}
+    t=${t//__TIMER_LIST__/${TIMER_LIST}}
+    t=${t//__TIMER_HELPERS__/${TIMER_HELPERS}}
+    t=${t//__POLE_COUNT__/${POLE_COUNT}}
+    t=${t//__HOLD__/${HOLD}}
+    t=${t//__LUX_SENSOR__/${LUX_SENSOR}}
+    t=${t//__LUX_DAY__/${LUX_DAY}}
+    t=${t//__LUX_NIGHT__/${LUX_NIGHT}}
+    t=${t//__BRI_BASE__/$(pct brightness_base)}
+    t=${t//__BRI_WAVE__/$(pct brightness_wave)}
+    t=${t//__BRI_BOOST__/$(pct brightness_boost)}
+    t=${t//__BRI_BASELINE__/$(pct brightness_baseline)}
+    t=${t//__SCENARIO__/$(opt '.scenario')}
+    t=${t//__ENERGY_ENABLED__/${INSTALL_ENERGY}}
+    t=${t//__SHELLY_ENERGY__/${SHELLY_ENERGY}}
+    t=${t//__START_DATE__/$(opt '.experiment_start_date')}
+    printf '%s\n' "$t" > "$2"
+}
+
+# -----------------------------------------------------------------------------
+# 3. Packages
+# -----------------------------------------------------------------------------
+if [ "${INSTALL_AUTOMATION}" = "true" ] || [ "${INSTALL_ENERGY}" = "true" ]; then
+    fill "${SRC}/kolones_helpers.yaml.tpl" "${OUT}/smart_city_poles_helpers.yaml"
+fi
+if [ "${INSTALL_AUTOMATION}" = "true" ]; then
+    fill "${SRC}/kolones_automation.yaml.tpl" "${OUT}/smart_city_poles_automation.yaml"
+fi
+if [ "${INSTALL_ENERGY}" = "true" ]; then
+    fill "${SRC}/kolones_energy.yaml.tpl" "${OUT}/smart_city_poles_energy.yaml"
+fi
+if [ "$(opt '.install_influxdb')" = "true" ]; then
+    cp "${SRC}/kolones_influxdb.yaml.tpl" "${OUT}/smart_city_poles_influxdb.yaml"
+fi
+
+# -----------------------------------------------------------------------------
+# 4. Dashboard configuration (no secrets in here - it is served to the browser)
+# -----------------------------------------------------------------------------
+if [ -n "${DASH_JSON}" ]; then
+    jq '{
+      version: 2,
+      demo_poles: (.demo_poles // false),
+      map_zoom: (.map_zoom // 16),
+      poles: [ .poles | to_entries[] | .key as $i | .value
+        | {
+            id, name,
+            location: (.location // ""),
+            lat: .latitude, lng: .longitude,
+            color: (["#4f98a3","#e8af34","#6daa45","#c084fc","#38bdf8","#fb7185",
+                     "#34d399","#f59e0b","#a3e635","#f472b6"][$i % 10]),
+            light, presence,
+            status_entity: ((.status_entity // "") | if . == "" then null else . end),
+            entity_match: ((.entity_match // .id) | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(. != ""))),
+            parking: (if .parking_occupied_cm != null
+                      then { occ_cm: .parking_occupied_cm,
+                             free_cm: (.parking_free_cm // (.parking_occupied_cm + 3)) }
+                      else null end)
+          } ]
+    }' "${OPTS}" > "${DASH_JSON}"
+fi
+
+echo "Rendered ${POLE_COUNT} pole(s) into ${OUT}"

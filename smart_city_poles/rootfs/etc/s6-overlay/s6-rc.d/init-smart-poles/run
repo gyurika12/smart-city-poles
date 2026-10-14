@@ -1,8 +1,9 @@
 #!/usr/bin/with-contenv bashio
 # =============================================================================
 #  Smart City Poles - initialisation
-#  1. Renders the energy-experiment package and the control automation from
-#     the add-on options into /config/packages/
+#  1. Renders the helpers, control automation, energy and InfluxDB packages
+#     and the dashboard config from the add-on options (smart-poles-render)
+#     into /config/packages/ and /www/config.json
 #  2. Makes sure configuration.yaml loads the packages directory
 #  3. Validates the config and reloads (or asks for a restart)
 # =============================================================================
@@ -10,13 +11,7 @@
 CONFIG_DIR="/config"
 PKG_DIR="${CONFIG_DIR}/packages"
 CONF_YAML="${CONFIG_DIR}/configuration.yaml"
-ENERGY_TPL="/usr/src/kolones_energy.yaml.tpl"
-AUTOMATION_TPL="/usr/src/kolones_automation.yaml.tpl"
-INFLUXDB_TPL="/usr/src/kolones_influxdb.yaml.tpl"
 GRAFANA_SRC="/usr/src/grafana"
-ENERGY_PKG="${PKG_DIR}/smart_city_poles_energy.yaml"
-AUTOMATION_PKG="${PKG_DIR}/smart_city_poles_automation.yaml"
-INFLUXDB_PKG="${PKG_DIR}/smart_city_poles_influxdb.yaml"
 GPROV="/share/grafana-provisioning"
 
 HA_API="http://supervisor/core/api"
@@ -33,20 +28,6 @@ ha_notify() {
         "${HA_API}/services/persistent_notification/create" > /dev/null || true
 }
 
-render() {
-    # $1 = template, $2 = destination
-    sed -e "s|__LIGHT1__|${LIGHT1}|g" \
-        -e "s|__LIGHT2__|${LIGHT2}|g" \
-        -e "s|__LIGHT3__|${LIGHT3}|g" \
-        -e "s|__PRESENCE1__|${PRESENCE1}|g" \
-        -e "s|__PRESENCE2__|${PRESENCE2}|g" \
-        -e "s|__PRESENCE3__|${PRESENCE3}|g" \
-        -e "s|__LUX_SENSOR__|${LUX_SENSOR}|g" \
-        -e "s|__SHELLY_ENERGY__|${SHELLY_ENERGY}|g" \
-        -e "s|__START_DATE__|${START_DATE}|g" \
-        "$1" > "$2"
-}
-
 write_if_changed() {
     # $1 = rendered source, $2 = destination. Returns 0 when it wrote (changed).
     if [ -f "$2" ] && cmp -s "$1" "$2"; then
@@ -60,18 +41,6 @@ write_if_changed() {
 # -----------------------------------------------------------------------------
 # Read options
 # -----------------------------------------------------------------------------
-INSTALL_AUTOMATION=$(bashio::config 'install_automation')
-INSTALL_ENERGY=$(bashio::config 'install_energy_package')
-LIGHT1=$(bashio::config 'light_pole_1')
-LIGHT2=$(bashio::config 'light_pole_2')
-LIGHT3=$(bashio::config 'light_pole_3')
-PRESENCE1=$(bashio::config 'presence_pole_1')
-PRESENCE2=$(bashio::config 'presence_pole_2')
-PRESENCE3=$(bashio::config 'presence_pole_3')
-LUX_SENSOR=$(bashio::config 'lux_sensor')
-SHELLY_ENERGY=$(bashio::config 'shelly_energy_entity')
-START_DATE=$(bashio::config 'experiment_start_date')
-INSTALL_INFLUXDB=$(bashio::config 'install_influxdb')
 INSTALL_GRAFANA=$(bashio::config 'install_grafana')
 INFLUX_USER=$(bashio::config 'influx_reader_user')
 INFLUX_PASS=$(bashio::config 'influx_reader_password')
@@ -81,71 +50,49 @@ CHANGED=0
 
 mkdir -p "${PKG_DIR}"
 
+# -----------------------------------------------------------------------------
+# 1. Render packages + dashboard config from the options into a staging dir
+# -----------------------------------------------------------------------------
+STAGE=$(mktemp -d)
+if ! RENDER_LOG=$(smart-poles-render /data/options.json /usr/src "${STAGE}" /www/config.json 2>&1); then
+    bashio::log.error "${RENDER_LOG}"
+    ha_notify "Smart City Poles: οι ρυθμίσεις του add-on δεν είναι έγκυρες - δεν εγκαταστάθηκε τίποτα. Δες το log του add-on. $(echo "${RENDER_LOG}" | tr '\n"' ' ' | head -c 400)"
+    # Keep the dashboard reachable so the problem is visible there too
+    echo '{"version":2,"error":"invalid add-on options - see the add-on log","poles":[]}' > /www/config.json
+    exit 0
+fi
+while IFS= read -r line; do
+    case "${line}" in
+        WARNING:*) bashio::log.warning "${line#WARNING: }" ;;
+        *) bashio::log.info "${line}" ;;
+    esac
+done <<< "${RENDER_LOG}"
 
 # -----------------------------------------------------------------------------
-# 1. Energy package (helpers + meters + sensors)
+# 2. Install / update / remove each managed package
+#    InfluxDB loads at boot only; removing any package also needs a restart.
 # -----------------------------------------------------------------------------
-if bashio::var.true "${INSTALL_ENERGY}"; then
-    render "${ENERGY_TPL}" "${ENERGY_PKG}.tmp"
-    if write_if_changed "${ENERGY_PKG}.tmp" "${ENERGY_PKG}"; then
-        bashio::log.info "Energy package written to ${ENERGY_PKG}"
-        CHANGED=1
-    else
-        bashio::log.info "Energy package unchanged."
-    fi
-else
-    if [ -f "${ENERGY_PKG}" ]; then
-        bashio::log.warning "install_energy_package is off - removing ${ENERGY_PKG}"
-        rm -f "${ENERGY_PKG}"
+for NAME in helpers automation energy influxdb; do
+    FILE="smart_city_poles_${NAME}.yaml"
+    if [ -f "${STAGE}/${FILE}" ]; then
+        if write_if_changed "${STAGE}/${FILE}" "${PKG_DIR}/${FILE}"; then
+            bashio::log.info "Package ${FILE} written to ${PKG_DIR}"
+            CHANGED=1
+            if [ "${NAME}" = "influxdb" ]; then
+                bashio::log.warning "InfluxDB loads at boot only - a full Home Assistant restart is required. Also make sure secrets.yaml contains influxdb_password."
+                NEEDS_RESTART=1
+            fi
+        else
+            bashio::log.info "Package ${FILE} unchanged."
+        fi
+    elif [ -f "${PKG_DIR}/${FILE}" ]; then
+        bashio::log.warning "Package ${FILE} is disabled - removing it"
+        rm -f "${PKG_DIR}/${FILE}"
         CHANGED=1
         NEEDS_RESTART=1
     fi
-fi
-
-# -----------------------------------------------------------------------------
-# 2. Control automation (needs the helpers from the energy package)
-# -----------------------------------------------------------------------------
-if bashio::var.true "${INSTALL_AUTOMATION}"; then
-    if bashio::var.false "${INSTALL_ENERGY}"; then
-        bashio::log.warning "The automation needs the helpers (input_select.kolones_mode, counter, timers). Make sure they exist - e.g. from a manual install of the energy package."
-    fi
-    render "${AUTOMATION_TPL}" "${AUTOMATION_PKG}.tmp"
-    if write_if_changed "${AUTOMATION_PKG}.tmp" "${AUTOMATION_PKG}"; then
-        bashio::log.info "Control automation written to ${AUTOMATION_PKG}"
-        CHANGED=1
-    else
-        bashio::log.info "Control automation unchanged."
-    fi
-else
-    if [ -f "${AUTOMATION_PKG}" ]; then
-        bashio::log.warning "install_automation is off - removing ${AUTOMATION_PKG}"
-        rm -f "${AUTOMATION_PKG}"
-        CHANGED=1
-        NEEDS_RESTART=1
-    fi
-fi
-
-# -----------------------------------------------------------------------------
-# 2b. InfluxDB package (long-term storage for Grafana) - needs a full restart
-# -----------------------------------------------------------------------------
-if bashio::var.true "${INSTALL_INFLUXDB}"; then
-    cp "${INFLUXDB_TPL}" "${INFLUXDB_PKG}.tmp"
-    if write_if_changed "${INFLUXDB_PKG}.tmp" "${INFLUXDB_PKG}"; then
-        bashio::log.info "InfluxDB package written to ${INFLUXDB_PKG}"
-        bashio::log.warning "InfluxDB loads at boot only - a full Home Assistant restart is required. Also make sure secrets.yaml contains influxdb_password."
-        CHANGED=1
-        NEEDS_RESTART=1
-    else
-        bashio::log.info "InfluxDB package unchanged."
-    fi
-else
-    if [ -f "${INFLUXDB_PKG}" ]; then
-        bashio::log.warning "install_influxdb is off - removing ${INFLUXDB_PKG}"
-        rm -f "${INFLUXDB_PKG}"
-        CHANGED=1
-        NEEDS_RESTART=1
-    fi
-fi
+done
+rm -rf "${STAGE}"
 
 # -----------------------------------------------------------------------------
 # 2c. Grafana provisioning kit (datasource + 29-panel dashboard) in /share
@@ -216,14 +163,14 @@ if [ "${CHANGED}" -eq 1 ]; then
             bashio::log.info "Configuration valid - reloading..."
             curl -sS -X POST -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
                 "${HA_API}/services/homeassistant/reload_all" > /dev/null || true
-            ha_notify "Τα packages των Smart City Poles (ενέργεια + αυτοματισμός) εγκαταστάθηκαν και φορτώθηκαν χωρίς restart. Δες τα entities kolones_* και τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος»."
+            ha_notify "Τα packages των Smart City Poles εγκαταστάθηκαν και φορτώθηκαν χωρίς restart. Δες τα entities kolones_* και τον αυτοματισμό «Κολόνες - Πλήρης έλεγχος»."
         fi
     else
         bashio::log.error "Configuration check failed: ${ERRORS}"
         ha_notify "ΠΡΟΣΟΧΗ: το check configuration απέτυχε μετά την εγκατάσταση των Smart City Poles. Σφάλμα: ${ERRORS:-άγνωστο}. Δες το log του add-on, διόρθωσε τις ρυθμίσεις (Configuration tab) και κάνε restart το add-on."
     fi
 else
-    bashio::log.info "Nothing to install (both install options are off) - dashboard only."
+    bashio::log.info "Packages unchanged - nothing to reload."
 fi
 
 bashio::log.info "Smart City Poles initialisation finished."

@@ -147,12 +147,13 @@ tools/             Script για το PDF σύγκρισης και για αφ�
 Αυτό το repository λειτουργεί και ως **add-on repository** του Home Assistant.
 Το add-on **Smart City Poles** σου δίνει:
 
-- το ζωντανό dashboard (χάρτης + γραφήματα) στο **sidebar** του Home Assistant μέσω ingress — χωρίς αντιγραφή στο `config/www/`,
-- **αυτόματη εγκατάσταση** του αυτοματισμού ελέγχου και του πακέτου πειράματος ενέργειας στο `config/packages/`, με όλα τα entity IDs (λάμπες, Shelly EM, αισθητήρες lux/παρουσίας) ρυθμιζόμενα από τις επιλογές του add-on.
+- το ζωντανό dashboard (χάρτης, γραφήματα ανά κολόνα, σύγκριση, έλεγχος αισθητήρων) στο **sidebar** του Home Assistant μέσω ingress — οι αισθητήρες βρίσκονται αυτόματα και οι βιβλιοθήκες είναι μέσα στο add-on, οπότε δουλεύει και χωρίς internet (εκτός από τα πλακίδια του χάρτη)·
+- τον αυτοματισμό ελέγχου (μέρα/νύχτα, κύμα φωτός, σενάρια baseline/adaptive) για **οσεσδήποτε κολόνες**, ορισμένες ως λίστα στις ρυθμίσεις του add-on — χωρίς επεξεργασία YAML·
+- το πακέτο μέτρησης εξοικονόμησης ενέργειας, επιτήρηση κολονών με ειδοποιήσεις και προαιρετική ρύθμιση InfluxDB/Grafana.
 
 **Εγκατάσταση:** Ρυθμίσεις → Πρόσθετα → Add-on Store → ⋮ → Repositories → πρόσθεσε
 `https://github.com/gyurika12/smart-city-poles` → εγκατάσταση του **Smart City Poles** →
-συμπλήρωσε τα entity IDs σου στην καρτέλα Configuration → Start. Δες το
+πρόσθεσε τις κολόνες σου στην καρτέλα Configuration → Start. Δες το
 [`smart_city_poles/README.md`](smart_city_poles/README.md) και
 [πώς φτιάχτηκε το add-on](smart_city_poles/HOW_IT_WAS_BUILT.md).
 
@@ -160,6 +161,10 @@ tools/             Script για το PDF σύγκρισης και για αφ�
 
 - [Τεχνική τεκμηρίωση λογισμικού](docs/code-documentation_el.pdf) — αντιστοίχιση κώδικα σε κεφάλαια, αισθητήρες, πρωτόκολλο MQTT, πείραμα ενέργειας, πλήρης κατάλογος topics.
 - [Σύγκριση με τη βιβλιογραφία](docs/literature-comparison_el.pdf)
+
+## Άδεια χρήσης
+
+[MIT](LICENSE)
 
 ## Συγγραφέας
 

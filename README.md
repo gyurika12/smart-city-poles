@@ -147,12 +147,13 @@ tools/             PDF generator, token-removal patch for the HTML dashboard
 This repository is also a **Home Assistant add-on repository**. The
 **Smart City Poles** add-on gives you:
 
-- the live dashboard (map + charts) in the Home Assistant **sidebar** via ingress — no copy-paste to `config/www/`;
-- **automatic installation** of the control automation and the energy-experiment package into `config/packages/`, with all entity IDs (lights, Shelly EM, lux/presence sensors) configurable from the add-on options.
+- the live dashboard (map, per-pole charts, comparison, diagnostics) in the Home Assistant **sidebar** via ingress — sensors are discovered automatically and the libraries are bundled, so it also works without internet (except the map tiles);
+- the control automation (day/night, light wave, baseline/adaptive scenarios) for **any number of poles**, configured as a list in the add-on options — no YAML editing;
+- the energy-saving measurement package, a pole watchdog with notifications, and optional InfluxDB/Grafana setup.
 
 **Install:** Settings → Add-ons → Add-on Store → ⋮ → Repositories → add
 `https://github.com/gyurika12/smart-city-poles` → install **Smart City Poles** →
-set your entity IDs in the Configuration tab → Start. See
+add your poles in the Configuration tab → Start. See
 [`smart_city_poles/README.md`](smart_city_poles/README.md) and
 [how the add-on was built](smart_city_poles/HOW_IT_WAS_BUILT.md) (Greek).
 
@@ -160,6 +161,10 @@ set your entity IDs in the Configuration tab → Start. See
 
 - [Software technical documentation (Greek)](docs/code-documentation_el.pdf) — code-to-chapter map, sensors, MQTT protocol, energy experiment, full topic list.
 - [Comparison with the literature (Greek)](docs/literature-comparison_el.pdf)
+
+## License
+
+[MIT](LICENSE)
 
 ## Author
 
