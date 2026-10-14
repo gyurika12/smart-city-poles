@@ -16,6 +16,10 @@
 
 namespace Kolona {
 
+// Κάθε τιμή που στέλνει ο Publisher περνάει και από εδώ (το ορίζει το
+// KolonaApi, ώστε το HTTP /state να έχει τις ίδιες τιμές με το MQTT).
+inline void (*publishHook)(const char* topic, const char* payload) = nullptr;
+
 template <int N>
 class Publisher {
 public:
@@ -40,29 +44,36 @@ public:
   void i(int id, const char* topic, int v, float deadband) {          // ακέραιος
     if (!changed(id, (float)v, deadband)) return;
     char b[16]; snprintf(b, sizeof(b), "%d", v);
-    _m.publish(topic, b, true);
+    send(topic, b);
   }
   void l(int id, const char* topic, long v, float deadband) {         // long
     if (!changed(id, (float)v, deadband)) return;
     char b[16]; snprintf(b, sizeof(b), "%ld", v);
-    _m.publish(topic, b, true);
+    send(topic, b);
   }
   void f(int id, const char* topic, float v, int decimals, float deadband) {
     if (!changed(id, v, deadband)) return;
     char b[16]; dtostrf(v, 0, decimals, b);
-    _m.publish(topic, b, true);
+    send(topic, b);
   }
   void t(int id, const char* topic, bool state,                       // ON/OFF κτλ
          const char* onText, const char* offText) {
     if (!changed(id, state ? 1.0f : 0.0f, 0.5f)) return;
-    _m.publish(topic, state ? onText : offText, true);
+    send(topic, state ? onText : offText);
   }
   void s(int id, const char* topic, const char* text, float key) {    // κείμενο + κλειδί
     if (!changed(id, key, 0.5f)) return;
-    _m.publish(topic, text, true);
+    send(topic, text);
   }
 
 private:
+  // Χωρίς σύνδεση δεν στέλνεται τίποτα στο MQTT (μετά την επανασύνδεση το
+  // forceAll() τα ξαναστέλνει), αλλά η τιμή καταγράφεται για το HTTP API.
+  void send(const char* topic, const char* payload) {
+    if (_m.connected()) _m.publish(topic, payload, true);
+    if (publishHook) publishHook(topic, payload);
+  }
+
   PubSubClient& _m;
   float         _last[N]   = {};
   unsigned long _lastMs[N] = {};

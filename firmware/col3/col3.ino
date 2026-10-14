@@ -143,6 +143,7 @@ enum PubId {
   P_LDR, P_LDR2, P_BRIGHT, P_LASER, P_LEDSTATE, P_LEDMODE, P_LEDPWM, P_COUNT
 };
 Kolona::Publisher<P_COUNT> pub(net.mqtt());
+Kolona::Api api;                        // HTTP /info /state /led + mDNS
 
 bool bmeFound = false, sgpFound = false, loxFound = false;
 bool hcsr04Found = false, loraOK = false;
@@ -251,7 +252,6 @@ void serviceSensors() {
    6. MQTT
    =========================================================================== */
 void publishLedStatus() {
-  if (!net.mqttOk()) return;
   pub.s(P_LEDMODE,  topicLedMode,  led.modeString(), (float)led.mode());
   pub.t(P_LEDSTATE, topicLedState, led.on(), "ON", "OFF");
   pub.i(P_LEDPWM,   topicLedPwm,   led.pwm(), 3);
@@ -287,7 +287,6 @@ void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
 }
 
 void publishSensors() {
-  if (!net.mqttOk()) return;
   pub.f(P_TEMP,   topicTemp,   temperature,   1, 0.1f);
   pub.f(P_HUM,    topicHum,    humidity,      1, 0.3f);
   pub.f(P_PRESS,  topicPress,  pressure,      1, 0.2f);
@@ -307,6 +306,7 @@ void publishSensors() {
 void slideshowService() {
   serviceDetection();
   if (net.mqttOk()) net.mqtt().loop();
+  api.loop();
 }
 
 /* ===========================================================================
@@ -342,6 +342,39 @@ void updateBannerText() {
            ldrValue, ldr2Value, distanceMM, detect.lastValidMm(),
            g_laserTrig ? 1 : 0, led.pwm());
   banner.setText(t);
+}
+
+/* ---------------------------------------------------------------------------
+   HTTP API: ποια είναι η κολόνα και τι αισθητήρες έχει (για το integration).
+   Κάθε γραμμή = ένα entity στο Home Assistant. Το topic πρέπει να είναι το
+   ίδιο με αυτό που στέλνει ο Publisher παραπάνω.
+   --------------------------------------------------------------------------- */
+// POST /led από το Home Assistant: ίδια λογική με την εντολή MQTT.
+void onLedHttp(const char* mode) {
+  led.applyCommand(mode, true);
+  g_ledStatusDirty = true;
+}
+
+void registerApi() {
+  api.identity("col3", "Κολώνα 3", MY_INDEX);
+  api.mqtt(net.mqtt(), topicStatus, topicWaveTx);
+  api.sensor("temperature",  "Θερμοκρασία",          topicTemp,   "°C",  "temperature");
+  api.sensor("humidity",     "Υγρασία",              topicHum,    "%",   "humidity");
+  api.sensor("pressure",     "Πίεση",                topicPress,  "hPa", "atmospheric_pressure");
+  api.sensor("gas_bme",      "Αέριο (BME680)",       topicGas,    "kΩ");
+  api.sensor("eco2",         "CO₂ (eCO₂)",           topicCO2,    "ppm", "carbon_dioxide");
+  api.sensor("tvoc",         "TVOC",                 topicTVOC,   "ppb");
+  api.sensor("ldr",          "LDR 1",                topicLDR);
+  api.sensor("ldr2",         "LDR 2",                topicLDR2);
+  api.sensor("brightness",   "Φωτεινότητα (%)",      topicBright, "%");
+  api.sensor("distance_us",  "Απόσταση (υπέρηχοι)",  topicUS,     "cm",  "distance");
+  api.sensor("distance_tof", "Απόσταση (laser)",     topicTOF,    "mm",  "distance");
+  api.binary("presence",     "Παρουσία",             topicLaser,  "ON", "OFF", "occupancy");
+  api.binary("led_state",    "Λάμπα αναμμένη",       topicLedState, "ON", "OFF", "light");
+  api.sensor("led_pwm",      "PWM λάμπας",           topicLedPwm,   nullptr, nullptr);
+  api.text("led_mode",       "Λειτουργία λάμπας",    topicLedMode);
+  api.ledControl(topicLedCmd, topicLedMode, onLedHttp);
+  api.begin();
 }
 
 /* ===========================================================================
@@ -425,6 +458,7 @@ void setup() {
   } else Serial.println("LoRa FAIL");
 
   // --- Δίκτυο ---
+  registerApi();                   // πριν το WiFi (ορίζει το hostname)
   pub.setHeartbeat(PUB_HEARTBEAT_MS);
   net.begin(ssid, password, mqttServer, mqttPort,
             mqttUser, mqttPass, mqttClientId, topicStatus, 1);
@@ -455,6 +489,7 @@ void loop() {
 
   Kolona::safetyLoop();     // 1. δίχτυ ασφαλείας
   net.loop();               // 2. WiFi + MQTT χωρίς μπλοκάρισμα
+  api.loop();               //    HTTP API + mDNS για το Home Assistant
   serviceDetection();       // 3. laser + ράμπα φωτός
   serviceSensors();         // 4. LDR / BME / SGP30 / HC-SR04
 

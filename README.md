@@ -70,6 +70,7 @@ Brightness ramps smoothly (20 ms steps); day/night switching uses a two-threshol
 - **Sensor fusion** — SGP30 eCO₂/TVOC are humidity-compensated using absolute humidity computed from the BME280 (Magnus equation).
 - **Reliability safety net** — watchdog task (reboot if `loop()` stalls 30 s), heap guard, scheduled 12 h reboot, and the cause of the last reboot printed at boot.
 - **Memory-safe slideshow** — fixed `char` buffers instead of `String`, and the JPEG buffer allocated once at boot — this fixed crashes caused by heap fragmentation after hours of operation.
+- **Self-describing poles** — each pole serves a local HTTP API (`/info`, `/state`, `/led`) and announces itself over mDNS (`_kolona._tcp`), so Home Assistant can set it up from its IP alone. See the [API spec](docs/pole-http-api.md).
 - **Shared library (DRY)** — the logic common to all poles lives once in [`KolonaCore`](libraries/KolonaCore/src); each sketch keeps only its pins, topics and sensors (≈50 % smaller sketches).
 - **Compile-time display selection** — the two displays need different TFT_eSPI setups; a `build_opt.h` flag selects the right one automatically, and a compile-time check stops the build with a clear message if the wrong setup is used.
 
@@ -130,9 +131,9 @@ tools/             PDF generator, token-removal patch for the HTML dashboard
 
 1. **Arduino core:** install *esp32 by Espressif* (tested with 3.3.10), board `ESP32S3 Dev Module`.
 2. **Libraries** (Library Manager): PubSubClient, TFT_eSPI, TJpg_Decoder, LoRa (Sandeep Mistry), Adafruit VL53L0X, Adafruit BME280, Adafruit BME680, Adafruit SGP30, BH1750, DFRobot_LTR390UV, DFRobot_BME68x.
-3. **Shared library:** copy `libraries/KolonaCore` into your `Arduino/libraries/` folder.
+3. **Shared library:** copy `libraries/KolonaCore` into your `Arduino/libraries/` folder (copy it again after every update — the sketches use the installed copy).
 4. **Display setup:** copy the three files from `libraries/TFT_eSPI_setup/` into `Arduino/libraries/TFT_eSPI/` (overwriting the originals).
-5. **Credentials:** copy `firmware/secrets.example.h` as `secrets.h` into each sketch folder and fill in your WiFi / MQTT details.
+5. **Credentials:** copy `firmware/secrets.example.h` as `secrets.h` into each sketch folder and fill in your WiFi / MQTT details (optionally `KOLONA_API_TOKEN` to protect lamp control over HTTP).
 6. **Compile & upload**, e.g.:
    ```bash
    arduino-cli compile -b esp32:esp32:esp32s3 firmware/col1
