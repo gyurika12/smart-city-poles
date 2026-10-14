@@ -1,0 +1,67 @@
+name: Firmware CI
+
+on:
+  push:
+    paths:
+      - "firmware/**"
+      - "libraries/KolonaCore/**"
+      - "tools/mock_pole.py"
+      - ".github/workflows/firmware-ci.yaml"
+  pull_request:
+    paths:
+      - "firmware/**"
+      - "libraries/KolonaCore/**"
+      - "tools/mock_pole.py"
+  workflow_dispatch:
+
+env:
+  ESP32_INDEX: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+
+jobs:
+  compile:
+    name: Compile COL2 (KolonaCore + HTTP API)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up arduino-cli
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache Arduino data
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino-esp32-3.3.10
+
+      - name: Install ESP32 core and libraries
+        run: |
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX"
+          arduino-cli core install esp32:esp32@3.3.10 --additional-urls "$ESP32_INDEX"
+          arduino-cli lib install "PubSubClient" "LoRa" "Adafruit VL53L0X" \
+            "Adafruit BME280 Library" "Adafruit SGP30 Sensor"
+
+      # COL2 has no display, so it needs only Library Manager libraries; it
+      # exercises the whole shared KolonaCore library, HTTP API included.
+      - name: Compile COL2
+        run: |
+          cp firmware/secrets.example.h firmware/col2/secrets.h
+          arduino-cli compile -b esp32:esp32:esp32s3 --warnings default \
+            --library libraries/KolonaCore firmware/col2
+
+  mock:
+    name: Mock pole speaks the API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run the mock and check every endpoint
+        run: |
+          python3 tools/mock_pole.py --port 8080 --token secret &
+          sleep 2
+          curl -fs http://127.0.0.1:8080/info  | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['api']==1 and d['entities'], d"
+          curl -fs http://127.0.0.1:8080/state | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'temperature' in d['values'], d"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -d mode=ON http://127.0.0.1:8080/led)" = 401
+          curl -fs -X POST -H "Authorization: Bearer secret" -d mode=ON http://127.0.0.1:8080/led | grep -q '"ok": true'
+          echo "mock pole OK"

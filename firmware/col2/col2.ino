@@ -134,6 +134,7 @@ enum PubId {
   P_LASER, P_LEDSTATE, P_LEDMODE, P_LEDPWM, P_COUNT
 };
 Kolona::Publisher<P_COUNT> pub(net.mqtt());
+Kolona::Api api;                        // HTTP /info /state /led + mDNS
 
 bool loxFound = false, bmeFound = false, sgpFound = false, loraOk = false;
 
@@ -196,7 +197,6 @@ int ldrToPct(int raw) {
    6. MQTT
    =========================================================================== */
 void publishLedStatus() {
-  if (!net.mqttOk()) return;
   pub.s(P_LEDMODE,  topicLedMode,  led.modeString(), (float)led.mode());
   pub.t(P_LEDSTATE, topicLedState, led.on(), "ON", "OFF");
   pub.i(P_LEDPWM,   topicLedPwm,   led.pwm(), 3);
@@ -247,8 +247,6 @@ void buildPayload(bool laserTrig) {
 }
 
 void publishAll(bool laserTrig) {
-  if (!net.mqttOk()) return;
-
   pub.i(P_WATER,  topicWater,      lastWaterLevel, 20);   // ADC 12bit -> 20 counts
   pub.i(P_GAS,    topicGas,        lastGasValue,   20);
   pub.i(P_FLAME,  topicFlame,      lastFlameValue, 20);
@@ -281,6 +279,43 @@ void publishAll(bool laserTrig) {
     g_lastPayloadMs = now;
     net.mqtt().publish(topicLoRaRaw, g_payload, true);
   }
+}
+
+/* ---------------------------------------------------------------------------
+   HTTP API: ποια είναι η κολόνα και τι αισθητήρες έχει (για το integration).
+   Κάθε γραμμή = ένα entity στο Home Assistant. Το topic πρέπει να είναι το
+   ίδιο με αυτό που στέλνει ο Publisher παραπάνω.
+   --------------------------------------------------------------------------- */
+// POST /led από το Home Assistant: ίδια λογική με την εντολή MQTT.
+void onLedHttp(const char* mode) {
+  led.applyCommand(mode, true);
+  g_ledStatusDirty = true;
+}
+
+void registerApi() {
+  api.identity("col2", "Κολώνα 2", MY_INDEX);
+  api.mqtt(net.mqtt(), topicStatus, topicWaveTx);
+  api.sensor("temperature",  "Θερμοκρασία",          topicBmeTemp,    "°C",  "temperature");
+  api.sensor("humidity",     "Υγρασία",              topicBmeHum,     "%",   "humidity");
+  api.sensor("pressure",     "Πίεση",                topicBmePress,   "hPa", "atmospheric_pressure");
+  api.sensor("eco2",         "CO₂ (eCO₂)",           topicEco2,       "ppm", "carbon_dioxide");
+  api.sensor("tvoc",         "TVOC",                 topicTvoc,       "ppb");
+  api.sensor("gas",          "Αέριο (ADC)",          topicGas);
+  api.sensor("water_level",  "Στάθμη νερού (ADC)",   topicWater);
+  api.sensor("flame",        "Φλόγα (ADC)",          topicFlame);
+  api.sensor("audio",        "Ήχος (ADC)",           topicAudio);
+  api.sensor("ldr",          "LDR 1",                topicLDR1);
+  api.sensor("ldr2",         "LDR 2",                topicLDR2);
+  api.sensor("light_level",  "Στάθμη φωτός",         topicLightLevel);
+  api.sensor("brightness",   "Φωτεινότητα (%)",      topicBrightness, "%");
+  api.sensor("distance_us",  "Απόσταση (υπέρηχοι)",  topicUS,         "cm",  "distance");
+  api.sensor("distance_tof", "Απόσταση (laser)",     topicTOF,        "mm",  "distance");
+  api.binary("presence",     "Παρουσία",             topicLaserTrig,  "ON", "OFF", "occupancy");
+  api.binary("led_state",    "Λάμπα αναμμένη",       topicLedState, "ON", "OFF", "light");
+  api.sensor("led_pwm",      "PWM λάμπας",           topicLedPwm,   nullptr, nullptr);
+  api.text("led_mode",       "Λειτουργία λάμπας",    topicLedMode);
+  api.ledControl(topicLedCmd, topicLedMode, onLedHttp);
+  api.begin();
 }
 
 /* ===========================================================================
@@ -326,6 +361,7 @@ void setup() {
   Serial.println(loraOk ? "LoRa OK" : "LoRa FAIL");
 
   // --- Δίκτυο ---
+  registerApi();                   // πριν το WiFi (ορίζει το hostname)
   pub.setHeartbeat(PUB_HEARTBEAT_MS);
   net.begin(ssid, password, mqtt_server, mqtt_port,
             mqtt_user, mqtt_pass, mqtt_client_id, topicStatus, 1);
@@ -347,6 +383,7 @@ void loop() {
 
   Kolona::safetyLoop();     // 1. δίχτυ ασφαλείας
   net.loop();               // 2. WiFi + MQTT χωρίς μπλοκάρισμα
+  api.loop();               //    HTTP API + mDNS για το Home Assistant
 
   if (g_ledStatusDirty && net.mqttOk()) { g_ledStatusDirty = false; publishLedStatus(); }
 

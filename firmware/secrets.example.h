@@ -20,3 +20,8 @@
 #define MQTT_PASSWORD  "your-mqtt-password"
 
 #define HA_BASE_URL    "http://your-ha-ip:8123"     // Home Assistant (slideshow images, COL1/COL3)
+
+// Optional: protects POST /led of the local HTTP API (Home Assistant integration).
+// Empty = no password (only on a closed network). Use the same value in the
+// integration. / Προαιρετικό: κωδικός για το POST /led του τοπικού HTTP API.
+#define KOLONA_API_TOKEN ""

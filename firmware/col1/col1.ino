@@ -167,6 +167,7 @@ enum PubId {
   P_LEDSTATE, P_LEDMODE, P_LEDPWM, P_COUNT
 };
 Kolona::Publisher<P_COUNT> pub(net.mqtt());
+Kolona::Api api;                        // HTTP /info /state /led + mDNS
 
 bool bh1750Found = false, ltr390Found = false, bme688Found = false;
 Adafruit_LTR390 ltrAda;              // χρησιμοποιείται αν δεν βρεθεί το DFRobot (0x1C)
@@ -248,7 +249,6 @@ void serviceDetection() {
    6. MQTT
    =========================================================================== */
 void publishLedStatus() {
-  if (!net.mqttOk()) return;
   pub.s(P_LEDMODE,  topicLedMode,  led.modeString(), (float)led.mode());
   pub.t(P_LEDSTATE, topicLedState, led.on(), "ON", "OFF");
   pub.i(P_LEDPWM,   topicLedPwm,   led.pwm(), 3);
@@ -284,7 +284,6 @@ void mqttCallback(char* topic, uint8_t* payload, unsigned int length) {
 }
 
 void publishSensors() {
-  if (!net.mqttOk()) return;
   pub.f(P_TEMP,   topicTemp,      bmeTemp,   1, 0.1f);
   pub.f(P_HUM,    topicHum,       bmeHum,    1, 0.3f);
   pub.f(P_PRESS,  topicPress,     bmePres,   0, 10.0f);   // σε Pa! Το Home Assistant το διαιρεί με 100 (value_template) -> hPa
@@ -321,6 +320,7 @@ void sendLoRa() {
 void slideshowService() {
   serviceDetection();
   if (net.mqttOk()) net.mqtt().loop();
+  api.loop();
 }
 
 /* ===========================================================================
@@ -357,6 +357,41 @@ void updateBannerText() {
   snprintf(t, sizeof(t), "LUX:%.1f TOF:%d BASE:%d TRIG:%d PWM:%d",
            disp_lux, disp_tof, detect.lastValidMm(), disp_laserTrig ? 1 : 0, led.pwm());
   banner.setText(t);
+}
+
+/* ---------------------------------------------------------------------------
+   HTTP API: ποια είναι η κολόνα και τι αισθητήρες έχει (για το integration).
+   Κάθε γραμμή = ένα entity στο Home Assistant. Το topic πρέπει να είναι το
+   ίδιο με αυτό που στέλνει ο Publisher παραπάνω.
+   --------------------------------------------------------------------------- */
+// POST /led από το Home Assistant: ίδια λογική με την εντολή MQTT.
+void onLedHttp(const char* mode) {
+  led.applyCommand(mode, true);
+  g_ledStatusDirty = true;
+}
+
+void registerApi() {
+  api.identity("col1", "Κολώνα 1", MY_INDEX);
+  api.mqtt(net.mqtt(), topicStatus, topicWaveTx);
+  api.sensor("temperature",  "Θερμοκρασία",          topicTemp,   "°C",  "temperature");
+  api.sensor("humidity",     "Υγρασία",              topicHum,    "%",   "humidity");
+  api.sensor("pressure",     "Πίεση",                topicPress,  "hPa", "atmospheric_pressure", 0.01f);  // το topic στέλνει Pa
+  api.sensor("gas_bme",      "Αέριο (BME688)",       topicGasBME, "Ω");
+  api.sensor("lux",          "Φωτεινότητα",          topicLux,    "lx",  "illuminance");
+  api.sensor("uv",           "Δείκτης UV",           topicUV);
+  api.sensor("distance_us",  "Απόσταση (υπέρηχοι)",  topicUS,     "cm",  "distance");
+  api.sensor("distance_tof", "Απόσταση (laser)",     topicTOF,    "mm",  "distance");
+  api.sensor("air_quality",  "Ποιότητα αέρα (ADC)",  topicAirQ);
+  api.sensor("gas",          "Αέριο (ADC)",          topicGasAn);
+  api.sensor("ldr",          "LDR",                  topicLDR);
+  api.binary("presence",     "Παρουσία",             topicLaserTrig, "ON", "OFF", "occupancy");
+  api.binary("motion",       "Κίνηση (PIR)",         topicPIR,       "ON", "OFF", "motion");
+  api.binary("rain",         "Βροχή",                topicRain,      "RAIN", "DRY", "moisture");
+  api.binary("led_state",    "Λάμπα αναμμένη",       topicLedState, "ON", "OFF", "light");
+  api.sensor("led_pwm",      "PWM λάμπας",           topicLedPwm,   nullptr, nullptr);
+  api.text("led_mode",       "Λειτουργία λάμπας",    topicLedMode);
+  api.ledControl(topicLedCmd, topicLedMode, onLedHttp);
+  api.begin();
 }
 
 /* ===========================================================================
@@ -458,6 +493,7 @@ void setup() {
   Serial.println(loraFound ? "LoRa OK" : "LoRa FAIL");
 
   // --- Δίκτυο ---
+  registerApi();                   // πριν το WiFi (ορίζει το hostname)
   pub.setHeartbeat(PUB_HEARTBEAT_MS);
   net.begin(ssid, password, mqtt_server, mqtt_port,
             mqtt_user, mqtt_pass, mqtt_client_id, topicStatus, 0);
@@ -483,6 +519,7 @@ void loop() {
 
   Kolona::safetyLoop();     // 1. δίχτυ ασφαλείας
   net.loop();               // 2. WiFi + MQTT χωρίς μπλοκάρισμα
+  api.loop();               //    HTTP API + mDNS για το Home Assistant
   serviceBME();             // 3. BME688 χωρίς delay
   serviceDetection();       // 4. laser + ράμπα φωτός
 
