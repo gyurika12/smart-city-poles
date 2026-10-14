@@ -38,8 +38,9 @@ jobs:
         run: |
           arduino-cli core update-index --additional-urls "$ESP32_INDEX"
           arduino-cli core install esp32:esp32@3.3.10 --additional-urls "$ESP32_INDEX"
-          arduino-cli lib install "PubSubClient" "LoRa" "Adafruit VL53L0X" \
-            "Adafruit BME280 Library" "Adafruit SGP30 Sensor"
+          arduino-cli lib update-index
+          arduino-cli lib install "PubSubClient@2.8" "LoRa@0.8.0" "Adafruit_VL53L0X@1.2.5" \
+            "Adafruit BME280 Library@2.3.0" "Adafruit SGP30 Sensor@2.0.3"
 
       # COL2 has no display, so it needs only Library Manager libraries; it
       # exercises the whole shared KolonaCore library, HTTP API included.
