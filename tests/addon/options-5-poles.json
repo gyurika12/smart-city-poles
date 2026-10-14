@@ -1,0 +1,76 @@
+{
+  "poles": [
+    {
+      "id": "p1",
+      "name": "Pole 1",
+      "location": "Main St 1",
+      "latitude": 38.001,
+      "longitude": 21.7,
+      "light": "light.pole_1",
+      "presence": "binary_sensor.pole_1_presence",
+      "entity_match": "pole_1"
+    },
+    {
+      "id": "p2",
+      "name": "Pole 2",
+      "location": "Main St 2",
+      "latitude": 38.002,
+      "longitude": 21.7,
+      "light": "light.pole_2",
+      "presence": "binary_sensor.pole_2_presence",
+      "entity_match": "pole_2"
+    },
+    {
+      "id": "p3",
+      "name": "Pole 3",
+      "location": "Main St 3",
+      "latitude": 38.003,
+      "longitude": 21.7,
+      "light": "light.pole_3",
+      "presence": "binary_sensor.pole_3_presence",
+      "entity_match": "pole_3"
+    },
+    {
+      "id": "p4",
+      "name": "Pole 4",
+      "location": "Main St 4",
+      "latitude": 38.004,
+      "longitude": 21.7,
+      "light": "light.pole_4",
+      "presence": "binary_sensor.pole_4_presence",
+      "entity_match": "pole_4"
+    },
+    {
+      "id": "p5",
+      "name": "Pole 5",
+      "location": "Main St 5",
+      "latitude": 38.005,
+      "longitude": 21.7,
+      "light": "light.pole_5",
+      "presence": "binary_sensor.pole_5_presence",
+      "entity_match": "pole_5",
+      "neighbors": "p1, p4"
+    }
+  ],
+  "lux_sensor": "sensor.kolona_1_kolona_1_photeinoteta_lux",
+  "lux_day_above": 50,
+  "lux_night_below": 30,
+  "scenario": "adaptive",
+  "brightness_base": 75,
+  "brightness_wave": 88,
+  "brightness_boost": 100,
+  "brightness_baseline": 100,
+  "hold_seconds": 60,
+  "install_automation": true,
+  "install_energy_package": true,
+  "shelly_energy_entity": "sensor.shelly_energy",
+  "experiment_start_date": "2026-09-14",
+  "install_influxdb": true,
+  "install_grafana": false,
+  "influx_reader_user": "grafana",
+  "influx_reader_password": "",
+  "watchdog": true,
+  "watchdog_poll_seconds": 60,
+  "demo_poles": false,
+  "map_zoom": 16
+}

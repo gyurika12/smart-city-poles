@@ -1,44 +1,37 @@
 # Smart City Poles add-on
 
-Adaptive street-light poles (ESP32-S3 + MQTT) — live dashboard in the Home
-Assistant sidebar and one-click installation of the control automation and the
-energy-saving experiment.
+Adaptive street lighting for Home Assistant: any number of poles, a
+presence-triggered "light wave", day/night control, energy-saving
+measurement and a live map dashboard in the sidebar.
 
-Ζωντανό dashboard στο sidebar του Home Assistant και αυτόματη εγκατάσταση του
-αυτοματισμού ελέγχου και του πακέτου πειράματος ενέργειας για τις έξυπνες
-κολόνες φωτισμού.
+Προσαρμοστικός οδικός φωτισμός για το Home Assistant: οσεσδήποτε κολόνες,
+«κύμα φωτός» με την ανίχνευση διέλευσης, έλεγχος μέρας/νύχτας, μέτρηση
+εξοικονόμησης ενέργειας και ζωντανό dashboard με χάρτη στο sidebar.
 
 ## What it does / Τι κάνει
 
-1. **Dashboard (ingress):** serves the custom poles dashboard
-   (`home_assistant/www/dashboard_kolones.html`) at the "Smart Poles" sidebar
-   panel — live map, per-pole metrics, 24 h history charts, LED controls.
-   The HA API is proxied through the add-on with the Supervisor token, so
-   **no user token / "Keep me logged in" is required** any more.
-2. **Energy package:** writes helpers (`input_select.kolones_mode`,
-   `counter.kolones_passes_night`, `input_number.*`, `timer.kolona1-3`),
-   `utility_meter` tariffs (baseline/adaptive), `history_stats` hours and
-   template sensors (`Kolones Saving Pct` etc.) to
-   `/config/packages/smart_city_poles_energy.yaml`.
-3. **Automation:** writes the "Κολόνες - Πλήρης έλεγχος" automation to
-   `/config/packages/smart_city_poles_automation.yaml`.
-4. **Pole watchdog:** monitors the poles and notifies you when one goes
-   offline and when it recovers.
-5. **Optional InfluxDB config** (`install_influxdb`): long-term storage for
-   Grafana, as a package.
-6. **Optional Grafana provisioning** (`install_grafana`): ready datasource +
-   the 29-panel poles dashboard in `/share/grafana-provisioning/`.
-7. Makes sure `configuration.yaml` loads the `packages` directory
-   (backs it up first), validates the configuration and reloads — or tells you
-   in the notifications if a full restart is needed.
+1. **Dashboard (ingress)** — the "Smart Poles" sidebar panel: live map, per-pole
+   metrics and 24 h charts, comparison, overview, lamp state, LED-mode control
+   and sensor diagnostics. Poles come from the add-on options and their
+   sensors are discovered automatically. No user token needed; works without
+   internet (except the map tiles).
+2. **Lighting automation** — day/night switching, boost on detection, light
+   wave to the neighbouring poles, return to base after a hold time, and the
+   `adaptive` / `baseline` / `alternate` scenarios. All levels and thresholds
+   are options.
+3. **Energy package** — `utility_meter` per scenario, hours per scenario and
+   the measured saving percentage.
+4. **Pole watchdog** — notification when a pole goes offline and when it
+   recovers.
+5. **Optional InfluxDB / Grafana setup** for long-term storage and reports.
 
 ## Installation / Εγκατάσταση
 
-1. Settings → Add-ons → Add-on Store → ⋮ → Repositories → add:
+1. Settings → Add-ons → Add-on Store → ⋮ → Repositories → add
    `https://github.com/gyurika12/smart-city-poles`
 2. Install **Smart City Poles**.
-3. In the **Configuration** tab set your entity IDs (lights, Shelly EM energy
-   sensor, lux sensor, presence sensors) and the experiment start date.
+3. In the **Configuration** tab add your poles (lamp, presence sensor,
+   coordinates) and the lux sensor. See the [documentation](DOCS.md).
 4. Start the add-on and watch the log. If asked, restart Home Assistant once.
 5. Open the **Smart Poles** panel in the sidebar.
 
@@ -48,5 +41,5 @@ energy-saving experiment.
   edit the generated files, change the options instead.
 - Turning an install option **off** removes the corresponding generated package
   (a restart is then required).
-- The MQTT sensors of the poles themselves are still defined by your own
+- The MQTT sensors of the poles themselves are defined by your own
   configuration (see `home_assistant/` in the repository).

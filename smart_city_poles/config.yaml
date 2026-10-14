@@ -1,10 +1,10 @@
 name: Smart City Poles
-version: "1.1.0"
+version: "2.0.0"
 slug: smart_city_poles
 description: >-
-  Adaptive street-light poles: live dashboard (map + charts) in the sidebar and
-  automatic installation of the control automation and the energy-saving
-  experiment package.
+  Adaptive street lighting for any number of poles: presence-triggered
+  "light wave", day/night control, energy-saving measurement and a live
+  map dashboard in the sidebar.
 url: https://github.com/gyurika12/smart-city-poles
 arch:
   - aarch64
@@ -24,16 +24,50 @@ ingress_port: 8099
 panel_icon: mdi:lightbulb-group
 panel_title: Smart Poles
 options:
-  install_automation: true
-  install_energy_package: true
-  light_pole_1: light.yeelink_de_132850344_color3_s_2_light
-  light_pole_2: light.yeelink_de_132861009_color3_s_2_light
-  light_pole_3: light.yeelink_de_132926528_color3_s_2_light
-  presence_pole_1: binary_sensor.kolona_1_col1_laser
-  presence_pole_2: binary_sensor.kolona_2_col2_laser
-  presence_pole_3: binary_sensor.kolona_3_col3_laser
+  poles:
+    - id: col1
+      name: Κολώνα 1
+      location: Πλατεία Γεωργίου
+      latitude: 38.2472
+      longitude: 21.7335
+      light: light.yeelink_de_132850344_color3_s_2_light
+      presence: binary_sensor.kolona_1_col1_laser
+      status_entity: select.col1_led_mode
+      entity_match: col1, kolona_1
+    - id: col2
+      name: Κολώνα 2
+      location: Αγ. Νικολάου 12
+      latitude: 38.2455
+      longitude: 21.7358
+      light: light.yeelink_de_132861009_color3_s_2_light
+      presence: binary_sensor.kolona_2_col2_laser
+      status_entity: select.col2_led_mode
+      entity_match: col2, kolona_2
+      parking_occupied_cm: 20
+      parking_free_cm: 23.5
+    - id: col3
+      name: Κολώνα 3
+      location: Γούναρη 45
+      latitude: 38.2466
+      longitude: 21.7347
+      light: light.yeelink_de_132926528_color3_s_2_light
+      presence: binary_sensor.kolona_3_col3_laser
+      status_entity: select.col3_led_mode
+      entity_match: col3, kolona_3
+      parking_occupied_cm: 11.5
+      parking_free_cm: 12.5
   lux_sensor: sensor.kolona_1_kolona_1_photeinoteta_lux
-  shelly_energy_entity: sensor.shellyem_xxxxxxxxxxxx_channel_1_energy
+  lux_day_above: 50
+  lux_night_below: 30
+  scenario: alternate
+  brightness_base: 75
+  brightness_wave: 88
+  brightness_boost: 100
+  brightness_baseline: 100
+  hold_seconds: 60
+  install_automation: true
+  install_energy_package: false
+  shelly_energy_entity: ""
   experiment_start_date: "2026-09-14"
   install_influxdb: false
   install_grafana: false
@@ -41,17 +75,34 @@ options:
   influx_reader_password: ""
   watchdog: true
   watchdog_poll_seconds: 60
+  demo_poles: false
+  map_zoom: 16
 schema:
+  poles:
+    - id: match(^[a-z0-9_]{1,24}$)
+      name: str
+      location: str?
+      latitude: float(-90,90)
+      longitude: float(-180,180)
+      light: str
+      presence: str
+      status_entity: str?
+      entity_match: str?
+      neighbors: str?
+      parking_occupied_cm: float?
+      parking_free_cm: float?
+  lux_sensor: str
+  lux_day_above: float(0,100000)
+  lux_night_below: float(0,100000)
+  scenario: list(alternate|adaptive|baseline)
+  brightness_base: int(0,100)
+  brightness_wave: int(0,100)
+  brightness_boost: int(0,100)
+  brightness_baseline: int(0,100)
+  hold_seconds: int(5,3600)
   install_automation: bool
   install_energy_package: bool
-  light_pole_1: str
-  light_pole_2: str
-  light_pole_3: str
-  presence_pole_1: str
-  presence_pole_2: str
-  presence_pole_3: str
-  lux_sensor: str
-  shelly_energy_entity: str
+  shelly_energy_entity: str?
   experiment_start_date: match(^\d{4}-\d{2}-\d{2}$)
   install_influxdb: bool
   install_grafana: bool
@@ -59,3 +110,5 @@ schema:
   influx_reader_password: password
   watchdog: bool
   watchdog_poll_seconds: int(15,3600)
+  demo_poles: bool
+  map_zoom: int(3,19)

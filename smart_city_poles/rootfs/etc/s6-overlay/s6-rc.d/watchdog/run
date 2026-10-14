@@ -13,8 +13,11 @@ fi
 POLL=$(bashio::config 'watchdog_poll_seconds')
 HA_API="http://supervisor/core/api"
 
-ENTITIES=("select.col1_led_mode" "select.col2_led_mode" "select.col3_led_mode")
-NAMES=("Κολώνα 1" "Κολώνα 2" "Κολώνα 3")
+# One "alive" entity per pole: status_entity if set, otherwise the presence
+# sensor (both go unavailable through the MQTT last will).
+mapfile -t IDS < <(jq -r '.poles[].id' /data/options.json)
+mapfile -t ENTITIES < <(jq -r '.poles[] | (.status_entity // "") as $s | if $s != "" then $s else .presence end' /data/options.json)
+mapfile -t NAMES < <(jq -r '.poles[].name | gsub("\""; "")' /data/options.json)
 
 notify() {
     # $1 = notification id suffix, $2 = message (no double quotes)
@@ -25,12 +28,12 @@ notify() {
         "${HA_API}/services/persistent_notification/create" > /dev/null || true
 }
 
-bashio::log.info "Watchdog started (poll every ${POLL}s)."
+bashio::log.info "Watchdog started for ${#ENTITIES[@]} pole(s) (poll every ${POLL}s)."
 
 declare -A OFFLINE
 
 while true; do
-    for i in 0 1 2; do
+    for i in "${!ENTITIES[@]}"; do
         STATE=$(curl -s -m 10 -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
             "${HA_API}/states/${ENTITIES[$i]}" | jq -r '.state // "unavailable"')
 
@@ -38,13 +41,13 @@ while true; do
             if [ -z "${OFFLINE[$i]}" ]; then
                 OFFLINE[$i]=1
                 bashio::log.warning "${NAMES[$i]} is OFFLINE (${ENTITIES[$i]} = ${STATE})"
-                notify "col$((i+1))" "❌ Η ${NAMES[$i]} είναι εκτός σύνδεσης (${ENTITIES[$i]}: ${STATE}). Έλεγξε τροφοδοσία / WiFi / MQTT."
+                notify "${IDS[$i]}" "❌ ${NAMES[$i]}: εκτός σύνδεσης (${ENTITIES[$i]}: ${STATE}). Έλεγξε τροφοδοσία / WiFi / MQTT."
             fi
         else
             if [ -n "${OFFLINE[$i]}" ]; then
                 unset "OFFLINE[$i]"
                 bashio::log.info "${NAMES[$i]} is back online (${STATE})"
-                notify "col$((i+1))" "✅ Η ${NAMES[$i]} ξανασυνδέθηκε (κατάσταση: ${STATE})."
+                notify "${IDS[$i]}" "✅ ${NAMES[$i]}: ξανασυνδέθηκε (κατάσταση: ${STATE})."
             fi
         fi
     done

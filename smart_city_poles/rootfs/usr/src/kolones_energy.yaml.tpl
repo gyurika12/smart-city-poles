@@ -5,53 +5,8 @@
 #  add-on start. Change the options in the add-on Configuration tab instead.
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# 1. HELPERS: scenario selector, pass counters, return-to-base timers
-# -----------------------------------------------------------------------------
-input_select:
-  kolones_mode:
-    name: Σενάριο κολόνων
-    icon: mdi:lightbulb-group
-    options:
-      - baseline
-      - adaptive
-
-counter:
-  # Reset every night by the automation
-  kolones_passes_night:
-    name: Διελεύσεις νύχτας
-    icon: mdi:walk
-    step: 1
-
-input_number:
-  # The night's pass count is stored here in the morning
-  kolones_passes_last_baseline:
-    name: Διελεύσεις τελευταίας baseline νύχτας
-    min: 0
-    max: 100000
-    step: 1
-    mode: box
-  kolones_passes_last_adaptive:
-    name: Διελεύσεις τελευταίας adaptive νύχτας
-    min: 0
-    max: 100000
-    step: 1
-    mode: box
-
-timer:
-  # Return-to-base timers (the automation restarts them with 60 s on detection)
-  kolona1:
-    name: Κολώνα 1 - επιστροφή στη βάση
-    duration: "00:01:00"
-    restore: false
-  kolona2:
-    name: Κολώνα 2 - επιστροφή στη βάση
-    duration: "00:01:00"
-    restore: false
-  kolona3:
-    name: Κολώνα 3 - επιστροφή στη βάση
-    duration: "00:01:00"
-    restore: false
+# The helpers (input_select.kolones_mode, counters, timers) live in
+# smart_city_poles_helpers.yaml.
 
 # -----------------------------------------------------------------------------
 # 2. ENERGY WITH TWO TARIFFS - ONE PER SCENARIO
@@ -130,6 +85,6 @@ template:
         unique_id: kolones_avg_brightness
         unit_of_measurement: "bri"
         state: >
-          {% set l = ['__LIGHT1__', '__LIGHT2__', '__LIGHT3__'] %}
+          {% set l = __ALL_LIGHTS__ %}
           {{ (l | map('state_attr','brightness')
-                | map('int', 0) | sum / 3) | round(0) }}
+                | map('int', 0) | sum / (l | count)) | round(0) }}
