@@ -730,7 +730,11 @@ function wsConnect(){ if(!USE_WEBSOCKET) return; let ws; try{ ws=new WebSocket(H
 
   ws.onerror=()=>{ try{ ws.close(); }catch(_){} }; }
 
-async function refreshFromHA(){ let all=null; try{ all = await haGet('/api/states'); }catch(err){ all=null; } if(all){ allStatesCache = all; const byId = new Map(all.map(e => [e.entity_id, e])); for(const c of COLUMNS){ if(c.fake) continue; const s = state[c.id]; if(c.availability){ const av = byId.get(c.availability); s.online = !unavailable(av); } for(const [k, eid] of Object.entries(c.entities||{})){ applyEntityToState(c.id, k, byId.get(eid)); } } if(!(haWs && haWs.readyState===1)){ const t = new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); setStatus('connected', `Live από Home Assistant · ${t}`); } } else if(!(haWs && haWs.readyState===1)){ setStatus('error','HA εκτός — προσομοίωση ενεργή'); } liveRender(); }
+// Ένα αίτημα τη φορά: το /api/states κάποιες φορές αργεί αρκετά δευτερόλεπτα και τα αιτήματα στοιβάζονταν.
+// Όσο το WebSocket είναι ζωντανό, οι τιμές έρχονται από εκεί, οπότε το πλήρες poll γίνεται μόνο ανά 60 δευτ.
+let _refreshing = false, _lastRefresh = 0;
+function pollHA(){ if(haWs && haWs.readyState===1 && Date.now()-_lastRefresh < 60000) return; refreshFromHA(); }
+async function refreshFromHA(){ if(_refreshing) return; _refreshing = true; let all=null; try{ all = await haGet('/api/states'); }catch(err){ all=null; } finally{ _refreshing = false; _lastRefresh = Date.now(); } if(all){ allStatesCache = all; const byId = new Map(all.map(e => [e.entity_id, e])); for(const c of COLUMNS){ if(c.fake) continue; const s = state[c.id]; if(c.availability){ const av = byId.get(c.availability); s.online = !unavailable(av); } for(const [k, eid] of Object.entries(c.entities||{})){ applyEntityToState(c.id, k, byId.get(eid)); } } if(!(haWs && haWs.readyState===1)){ const t = new Date().toLocaleTimeString('el-GR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); setStatus('connected', `Live από Home Assistant · ${t}`); } } else if(!(haWs && haWs.readyState===1)){ setStatus('error','HA εκτός — προσομοίωση ενεργή'); } liveRender(); }
 
 async function loadHistory(){ for(const c of COLUMNS){ if(c.fake) continue; const keys = colMetrics(c).charts; const map = {}; keys.forEach(k=>{ const eid=(c.entities||{})[k]; if(eid) map[eid]=k; }); const ids = Object.keys(map); if(!ids.length) continue; const start = new Date(Date.now() - HISTORY_HOURS*3600*1000).toISOString(); try{ const data = await haGet(`/api/history/period/${start}?filter_entity_id=${ids.join(',')}&minimal_response&no_attributes`); for(const series of data){ if(!series.length) continue; const eid = series[0].entity_id; const key = map[eid]; if(!key) continue; const pts = series.map(p => ({ t:new Date(p.last_changed || p.last_updated).getTime(), v:num(p.state) })).filter(p => p.v !== null); if(pts.length) state[c.id].history[key] = downsample(pts, HISTORY_MAX_POINTS); } }catch(_){} } if(currentView === 'dashboard') renderDashboard(currentDashCol); }
 
@@ -740,7 +744,7 @@ async function toggleCol2LED(turnOn){ try{ await haPost(`/api/services/switch/${
 
 function sensorName(k){ return {temperature:'Θερμοκρασία',humidity:'Υγρασία',pressure:'Πίεση',gas:'Gas',eco2:'CO₂',tvoc:'TVOC',tof:'ToF',ultrasonic:'US',ldr:'LDR1',ldr2:'LDR2',water_level:'Water Level',flame:'Flame',audio:'Audio',light_level:'Light Level',lux:'Lux',uv:'UV'}[k] || k; }
 
-function parkingBanner(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const bg=!known?'var(--color-surface-offset)':(occ?'rgba(226,59,59,0.13)':'rgba(39,194,76,0.13)'); const label=!known?'Άγνωστο':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'❓':(occ?'🚗':'🅿️'); const sub=known?`HC-SR04 · ${fmt(p.dist,0)} cm (όριο ${PARKING_THRESHOLD_CM} cm)`:'HC-SR04 · χωρίς τιμή'; return `<div class="park-banner" style="background:${bg};border-color:${color}"><span class="park-ico">${ico}</span><div><div class="park-label" style="color:${color}">Θέση parking: ${label}</div><div class="park-sub">${sub}</div></div></div>`; }
+function parkingBanner(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const bg=!known?'var(--color-surface-offset)':(occ?'rgba(226,59,59,0.13)':'rgba(39,194,76,0.13)'); const label=!known?'Άγνωστο':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'❓':(occ?'🚗':'🅿️'); const sub=known?`HC-SR04 · ${fmt(p.dist,0)} cm (όριο ${(PARKING_CFG[col.id]||{occ_cm:50}).occ_cm} cm)`:'HC-SR04 · χωρίς τιμή'; return `<div class="park-banner" style="background:${bg};border-color:${color}"><span class="park-ico">${ico}</span><div><div class="park-label" style="color:${color}">Θέση parking: ${label}</div><div class="park-sub">${sub}</div></div></div>`; }
 
 function parkingExtraCard(col){ const p=parkingState(col); const known=p.known, occ=p.occupied; const color=!known?'var(--color-text-muted)':(occ?'#e23b3b':'#27c24c'); const label=!known?'—':(occ?'Πιασμένο':'Ελεύθερο'); const ico=!known?'🅿️':(occ?'🚗':'🅿️'); return `<div class="extra-card" style="border-color:${color}"><div class="extra-icon">${ico}</div><div><div class="extra-label">Θέση parking (HC-SR04)</div><div class="extra-val" style="color:${color}">${label}${known?` · ${fmt(p.dist,0)} cm`:''}</div></div></div>`; }
 
@@ -764,7 +768,13 @@ function colIconHtml(col){ const v=pollutionIndex(col); const ring=pollutionColo
 
 function makeColIcon(col){ return L.divIcon({className:'',html:colIconHtml(col),iconSize:[34,34],iconAnchor:[17,34],popupAnchor:[0,-36]}); }
 
-function updateMarkers(){ for(const c of COLUMNS){ const m=markerRefs[c.id]; if(m) m.setIcon(makeColIcon(c)); } }
+// Τα εικονίδια ΔΕΝ ξαναφτιάχνονται κάθε δευτερόλεπτο: αν άλλαζε το στοιχείο την ώρα που το πατάς,
+// το κλικ χανόταν (γι' αυτό η κολώνα «αργούσε» να ανοίξει). Αλλάζουν μόνο όταν αλλάξει η εμφάνισή τους
+// και ποτέ όσο κρατάς πατημένο το δάχτυλο/ποντίκι πάνω σε ένα εικονίδιο.
+const _iconCache = {}; let _pressedIcon = null;
+document.addEventListener('pointerdown', e=>{ _pressedIcon = e.target.closest && e.target.closest('.leaflet-marker-icon'); }, true);
+['pointerup','pointercancel'].forEach(t=>document.addEventListener(t, ()=>{ setTimeout(()=>{ _pressedIcon=null; }, 0); }, true));
+function updateMarkers(){ for(const c of COLUMNS){ const m=markerRefs[c.id]; if(!m) continue; const el=m.getElement(); if(el && el===_pressedIcon) continue; const h=colIconHtml(c); if(_iconCache[c.id]===h) continue; _iconCache[c.id]=h; if(el) el.innerHTML=h; else m.setIcon(makeColIcon(c)); } }
 
 function initMap(){ myMap = L.map('map',{center:[38.2465,21.7347],zoom:16,zoomControl:true}); window._baseTiles = L.tileLayer(tileUrl(),{attribution:'© Esri · © OpenStreetMap contributors',maxNativeZoom:16,maxZoom:19}).addTo(myMap); applyMapTheme(); pollutionLayer = L.layerGroup().addTo(myMap); COLUMNS.forEach(col=>{ const icon = makeColIcon(col); const marker = L.marker([col.lat,col.lng],{icon}).addTo(myMap); markerRefs[col.id]=marker; marker.on('click',()=>{ const popup = L.popup({closeButton:true,maxWidth:300}).setLatLng([col.lat,col.lng]).setContent(buildPopup(col)); popup.openOn(myMap); setTimeout(()=>{ const btn=document.getElementById(`open-dash-${col.id}`); if(btn) btn.onclick=()=>{popup.close(); openDashboard(col.id)}; },50); }); }); }
 
@@ -901,7 +911,7 @@ function buildOverview(){ const onlineN=COLUMNS.filter(c=>{const s=state[c.id];r
 
 document.getElementById('theme-btn').addEventListener('click',()=>{ dark = !dark; document.documentElement.setAttribute('data-theme', dark?'dark':'light'); document.getElementById('theme-btn').textContent = dark?'☾':'☀'; applyMapTheme(); if(currentView==='dashboard') renderDashboard(currentDashCol); if(currentView==='comparison'){ cmpBuilt=false; buildComparison(); } });
 
-document.addEventListener('DOMContentLoaded', async ()=>{ const _r=parseHash(); if(_r.embed) document.body.classList.add('embed'); initState(); for(let i=0;i<20;i++) simulateFake(); initMap(); applyInitialRoute(); setStatus('connecting','Σύνδεση με Home Assistant…'); buildEntityIndex(); await refreshFromHA(); loadHistory(); wsConnect(); setTimeout(()=>myMap&&myMap.invalidateSize(),300); setInterval(liveTick, RENDER_MS); setInterval(refreshFromHA, POLL_MS); });
+document.addEventListener('DOMContentLoaded', async ()=>{ const _r=parseHash(); if(_r.embed) document.body.classList.add('embed'); initState(); for(let i=0;i<20;i++) simulateFake(); initMap(); applyInitialRoute(); setStatus('connecting','Σύνδεση με Home Assistant…'); buildEntityIndex(); await refreshFromHA(); loadHistory(); wsConnect(); setTimeout(()=>myMap&&myMap.invalidateSize(),300); setInterval(liveTick, RENDER_MS); setInterval(pollHA, POLL_MS); });
 
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.classList.contains('ov-card')) e.target.click(); });
 
